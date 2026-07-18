@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "OZIRA AI",
+    "slug": "ozira-ai",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0B0B12",
+    "scheme": "ozira",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ozira.ai"
+    },
+    "android": {
+      "package": "com.ozira.ai"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-font"
+    ]
+  }
+}
