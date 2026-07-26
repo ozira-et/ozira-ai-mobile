@@ -11,18 +11,26 @@ import { zodiacFor } from '../zodiac';
 import { useLang } from '../context/LanguageContext';
 import { rtlText, rtlRow, rtlIcon } from '../i18n';
 
-const ITEMS = [
-  { key: 'mTools', icon: 'grid', color: colors.primary, route: 'Tools' },
-  { key: 'mPlans', icon: 'pricetag', color: colors.gold, route: 'Plans' },
-  { key: 'mUsage', icon: 'speedometer', color: colors.success, route: 'Usage' },
-  { key: 'mLibrary', icon: 'images', color: colors.secondary, route: 'Library' },
-  { key: 'mDev', icon: 'code-slash', color: colors.success, route: 'Developer' },
-  { key: 'mConnectors', icon: 'git-network', color: colors.accent, route: 'Connectors' },
-  { key: 'mSchedules', icon: 'alarm', color: colors.primary, route: 'Schedules' },
-  { key: 'mTeam', icon: 'people', color: colors.accent, route: 'Team' },
-  { key: 'mImport', icon: 'download', color: colors.secondary, route: 'Import' },
-  { key: 'mAccount', icon: 'person', color: colors.muted, route: 'Account' },
-  { key: 'mSettings', icon: 'settings', color: colors.muted, route: 'Settings' },
+// Grouped the same way as the web app's menu and this app's settings: a label
+// owns the block under it, so eleven destinations read as three short lists.
+const GROUPS = [
+  { title: 'menuWorkspace', items: [
+    { key: 'mTools', icon: 'grid', color: colors.primary, route: 'Tools' },
+    { key: 'mLibrary', icon: 'images', color: colors.secondary, route: 'Library' },
+  ] },
+  { title: 'menuTools', items: [
+    { key: 'mSchedules', icon: 'alarm', color: colors.primary, route: 'Schedules' },
+    { key: 'mConnectors', icon: 'git-network', color: colors.accent, route: 'Connectors' },
+    { key: 'mImport', icon: 'download', color: colors.secondary, route: 'Import' },
+    { key: 'mDev', icon: 'code-slash', color: colors.success, route: 'Developer' },
+  ] },
+  { title: 'menuAccount', items: [
+    { key: 'mPlans', icon: 'pricetag', color: colors.gold, route: 'Plans' },
+    { key: 'mUsage', icon: 'speedometer', color: colors.success, route: 'Usage' },
+    { key: 'mTeam', icon: 'people', color: colors.accent, route: 'Team' },
+    { key: 'mAccount', icon: 'person', color: colors.muted, route: 'Account' },
+    { key: 'mSettings', icon: 'settings', color: colors.muted, route: 'Settings' },
+  ] },
 ];
 
 export default function MenuScreen({ navigation }) {
@@ -54,15 +62,20 @@ export default function MenuScreen({ navigation }) {
           <Ionicons name="create-outline" size={18} color={colors.muted} />
         </Pressable>
 
-        {ITEMS.map(it => (
-          <Pressable key={it.route} style={[styles.row, rtlRow(rtl)]} onPress={() => navigation.navigate(it.route)}>
-            <View style={[styles.icon, { backgroundColor: it.color + '22' }]}><Ionicons name={it.icon} size={19} color={it.color} /></View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.rowLabel, rtlText(rtl)]}>{t(it.key)}</Text>
-              <Text style={[styles.rowSub, rtlText(rtl)]}>{t(it.key + 'Sub')}</Text>
-            </View>
-            <Ionicons name={rtlIcon('chevron-forward', rtl)} size={18} color={colors.muted} />
-          </Pressable>
+        {GROUPS.map(g => (
+          <View key={g.title}>
+            <Text style={[styles.group, rtlText(rtl)]}>{t(g.title)}</Text>
+            {g.items.map(it => (
+              <Pressable key={it.route} style={[styles.row, rtlRow(rtl)]} onPress={() => navigation.navigate(it.route)}>
+                <View style={[styles.icon, { backgroundColor: it.color + '22' }]}><Ionicons name={it.icon} size={19} color={it.color} /></View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.rowLabel, rtlText(rtl)]}>{t(it.key)}</Text>
+                  <Text style={[styles.rowSub, rtlText(rtl)]}>{t(it.key + 'Sub')}</Text>
+                </View>
+                <Ionicons name={rtlIcon('chevron-forward', rtl)} size={18} color={colors.muted} />
+              </Pressable>
+            ))}
+          </View>
         ))}
       </ScrollView>
     </View>
@@ -78,7 +91,9 @@ const makeStyles = (colors) => StyleSheet.create({
   name: { color: colors.text, fontFamily: fonts.semibold, fontSize: 16 },
   email: { color: colors.muted, fontFamily: fonts.regular, fontSize: 13, marginTop: 2 },
   sign: { color: colors.primary, fontFamily: fonts.semibold, fontSize: 13, marginTop: 2 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: 13, marginBottom: 10 },
+  // Matches the section label in SettingsScreen so both screens group alike.
+  group: { color: colors.muted, fontFamily: fonts.semibold, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 14, marginBottom: 8 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: 13, marginBottom: 8 },
   icon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   rowLabel: { color: colors.text, fontFamily: fonts.semibold, fontSize: 14.5 },
   rowSub: { color: colors.muted, fontFamily: fonts.regular, fontSize: 12, marginTop: 1 },
