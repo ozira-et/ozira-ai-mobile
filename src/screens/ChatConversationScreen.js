@@ -11,6 +11,7 @@ import { useLang } from '../context/LanguageContext';
 import { rtlText, rtlRow, rtlIcon } from '../i18n';
 import { useNotify } from '../context/NotifyContext';
 import { api, absUrl } from '../api';
+import Markdown from '../components/Markdown';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
@@ -456,8 +457,12 @@ export default function ChatConversationScreen({ navigation, route }) {
               <Image source={{ uri: m.image }} style={styles.image} resizeMode="cover" />
             ) : m.pending ? (
               <ActivityIndicator color={colors.muted} />
+            ) : m.role === 'assistant' ? (
+              // AI answers are markdown — render them as a formatted result,
+              // not raw ** and ## in a chat bubble.
+              <Markdown text={m.content} colors={colors} style={[styles.msgTxt, rtlText(rtl)]} />
             ) : (
-              <Text style={[styles.msgTxt, rtlText(rtl), m.role === 'user' && { color: colors.text }]}>{m.content}</Text>
+              <Text style={[styles.msgTxt, rtlText(rtl), { color: colors.text }]}>{m.content}</Text>
             )}
             {!m.image && !m.pending && m.content ? (
               <View style={styles.actionRow}>
