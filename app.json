@@ -18,8 +18,7 @@
       "package": "com.ozira.ai"
     },
     "plugins": [
-      "expo-secure-store",
-      "expo-font"
+      "expo-audio"
     ]
   }
 }

@@ -2,14 +2,19 @@ import React, { useState } from 'react';
 import { View, TextInput, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fonts, radius } from '../theme';
+import { useLang } from '../context/LanguageContext';
+import { rtlText, rtlRow } from '../i18n';
 
+// Shared text field. Mirrors itself for RTL languages (Arabic) so every screen
+// using <Input> gets right-to-left behaviour for free.
 export default function Input({ icon, secure, value, onChangeText, placeholder, keyboardType, autoCapitalize, style }) {
   const [hidden, setHidden] = useState(!!secure);
+  const { rtl } = useLang();
   return (
-    <View style={[styles.wrap, style]}>
-      {icon ? <Ionicons name={icon} size={18} color={colors.muted} style={{ marginRight: 8 }} /> : null}
+    <View style={[styles.wrap, rtlRow(rtl), style]}>
+      {icon ? <Ionicons name={icon} size={18} color={colors.muted} style={rtl ? { marginLeft: 8 } : { marginRight: 8 }} /> : null}
       <TextInput
-        style={styles.input}
+        style={[styles.input, rtlText(rtl)]}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}

@@ -1,41 +1,96 @@
-// OZIRA AI — auth state (Phase 1: your Railway backend + JWT in SecureStore).
-// Phase 2: swap this provider's internals for Clerk (useAuth/useUser). The rest
-// of the app only uses { user, signIn, signUp, signOut, token } so screens won't change.
+// OZIRA AI — auth state, backed by Supabase Auth.
+// The `token` here is Supabase's access token; the backend verifies it.
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import * as SecureStore from 'expo-secure-store';
-import { api, setToken } from '../api';
+import { supabase } from '../supabase';
+import { setToken } from '../api';
 
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
-const TOKEN_KEY = 'ozira_token';
-
 export function AuthProvider({ children }) {
   const [token, setTok] = useState(null);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(null);       // { id, email, ...profile }
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { (async () => {
+  // Load the profile row for the signed-in user.
+  async function loadProfile(session) {
+    if (!session) { setUser(null); return; }
+    const authUser = session.user;
+    let profile = {};
     try {
-      const saved = await SecureStore.getItemAsync(TOKEN_KEY);
-      if (saved) { setToken(saved); setTok(saved); const me = await api.me(saved); setUser(me.user); }
-    } catch (_) { await SecureStore.deleteItemAsync(TOKEN_KEY); }
-    setLoading(false);
-  })(); }, []);
-
-  async function persist(t) {
-    setToken(t); setTok(t);
-    await SecureStore.setItemAsync(TOKEN_KEY, t);
-    const me = await api.me(t); setUser(me.user);
+      const { data } = await supabase
+        .from('profiles').select('*').eq('id', authUser.id).single();
+      if (data) profile = data;
+    } catch (_) {}
+    setUser({ id: authUser.id, email: authUser.email, ...profile });
   }
 
-  const signIn = async (email, password) => { const d = await api.login(email, password); await persist(d.token); };
-  const signUp = async (name, email, password) => { const d = await api.register(name, email, password); await persist(d.token); };
-  const signOut = async () => { await SecureStore.deleteItemAsync(TOKEN_KEY); setTok(null); setUser(null); setToken(null); };
-  const refresh = async () => { if (token) { const me = await api.me(token); setUser(me.user); return me; } };
+  useEffect(() => {
+    // 1) Restore any existing session on boot. Never let a slow profile fetch
+    // block the app on the loading spinner — resolve loading first, then load
+    // the profile in the background.
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) { setToken(session.access_token); setTok(session.access_token); loadProfile(session); }
+      } catch (_) {}
+      setLoading(false);
+    })();
+
+    // 2) React to sign-in / sign-out / token-refresh.
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session) { setToken(session.access_token); setTok(session.access_token); await loadProfile(session); }
+      else { setToken(null); setTok(null); setUser(null); }
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  const signIn = async (email, password) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw new Error(error.message);
+  };
+
+  const signUp = async (name, email, password, lang, gender) => {
+    const { error } = await supabase.auth.signUp({
+      email, password, options: { data: { name, lang: lang || 'en', gender: gender || '' } },
+    });
+    if (error) throw new Error(error.message);
+  };
+
+  const signOut = async () => { await supabase.auth.signOut(); };
+
+  // --- Password reset (email OTP code, then set a new password) ---
+  // 1) Send a 6-digit code to the email.
+  const sendResetCode = async (email) => {
+    const { error } = await supabase.auth.signInWithOtp({
+      email, options: { shouldCreateUser: false },
+    });
+    if (error) throw new Error(error.message);
+  };
+  // 2) Verify the code (this signs the user in), then set the new password.
+  const resetPassword = async (email, code, newPassword) => {
+    const { error: vErr } = await supabase.auth.verifyOtp({ email, token: code, type: 'email' });
+    if (vErr) throw new Error(vErr.message);
+    const { error: uErr } = await supabase.auth.updateUser({ password: newPassword });
+    if (uErr) throw new Error(uErr.message);
+  };
+
+  // Re-fetch the profile row (after edits on the Profile screen, etc.)
+  const refresh = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    await loadProfile(session);
+  };
+
+  // Update the user's profile row in Supabase.
+  const updateProfile = async (patch) => {
+    if (!user?.id) return;
+    const { error } = await supabase.from('profiles').update(patch).eq('id', user.id);
+    if (error) throw new Error(error.message);
+    await refresh();
+  };
 
   return (
-    <AuthContext.Provider value={{ token, user, loading, signIn, signUp, signOut, refresh }}>
+    <AuthContext.Provider value={{ token, user, loading, signIn, signUp, signOut, refresh, updateProfile, sendResetCode, resetPassword }}>
       {children}
     </AuthContext.Provider>
   );
