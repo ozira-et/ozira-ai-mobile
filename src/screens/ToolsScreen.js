@@ -8,16 +8,20 @@ import FlagMenu from '../components/FlagMenu';
 import { useUI } from '../context/UIContext';
 
 // Each tool opens the chat with a matching backend skill preselected.
+// Every tile maps to a REAL dedicated skill on the server — Writer, Summarizer
+// and Code Helper used to silently open plain 'general', which made them
+// identical to normal chat.
 const TOOLS = [
-  { skill: 'general',    title: 'AI Writer',        sub: 'Write anything with AI',            icon: 'create',        color: colors.primary },
-  { skill: 'general',    title: 'Summarizer',       sub: 'Summarize long content',            icon: 'list',          color: colors.accent },
+  { skill: 'writer',     title: 'AI Writer',        sub: 'Letters, emails, posts, reports',   icon: 'create',        color: colors.primary },
+  { skill: 'summarizer', title: 'Summarizer',       sub: 'Summarize long content',            icon: 'list',          color: colors.accent },
   { skill: 'translator', title: 'Translator',       sub: 'Amharic - English translation',     icon: 'language',      color: colors.secondary },
   { skill: 'image',      title: 'Image Generator',  sub: 'Create images with AI',             icon: 'image',         color: colors.gold },
-  { skill: 'general',    title: 'Code Helper',      sub: 'Get help with code',                icon: 'code-slash',    color: colors.success },
+  { skill: 'code',       title: 'Code Helper',      sub: 'Write, debug and explain code',     icon: 'code-slash',    color: colors.success },
   { skill: 'contract',   title: 'Document Reviewer',sub: 'Review contracts and documents',    icon: 'document-text', color: colors.primary },
   { skill: 'business',   title: 'Business Planner', sub: 'Plans for the Ethiopian market',    icon: 'trending-up',   color: colors.accent },
   { skill: 'tutor',      title: 'Study Tutor',      sub: 'Learn step by step',                icon: 'school',        color: colors.secondary },
   { skill: 'marketing',  title: 'Marketing Copy',   sub: 'Ads for Telegram, TikTok and more', icon: 'megaphone',     color: colors.gold },
+  { skill: 'travel',     title: 'Travel Advisor',   sub: 'Trips in Ethiopia and abroad',      icon: 'airplane',      color: colors.primary },
 ];
 
 export default function ToolsScreen({ navigation }) {
