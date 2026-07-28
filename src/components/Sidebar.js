@@ -2,7 +2,7 @@
 // Plain built-in Animated (no Reanimated), and it does NOT transform the app
 // content — that was crashing Android.
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, Animated, Dimensions, TextInput, Modal, Alert, Image } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, Animated, Dimensions, TextInput, Modal, Alert, Image, ImageBackground } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { fonts, radius } from '../theme';
@@ -107,6 +107,8 @@ export default function Sidebar() {
       </Animated.View>
 
       <Animated.View style={[styles.panel, { width: WIDTH, paddingTop: insets.top + 8, transform: [{ translateX: tx }] }]}>
+        <ImageBackground source={require('../../assets/sidebar-artistic-gradient.png')} style={styles.panelImage} imageStyle={styles.panelImageArt}>
+        <View style={styles.panelContent}>
         <View style={styles.topRow}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <View style={styles.logoDot}><Logo size={22} /></View>
@@ -167,6 +169,8 @@ export default function Sidebar() {
           </Text>
         ) : null}
         <View style={{ height: insets.bottom + 6 }} />
+        </View>
+        </ImageBackground>
       </Animated.View>
 
       <Modal visible={createOpen} transparent animationType="fade" onRequestClose={() => setCreateOpen(false)}>
@@ -196,7 +200,10 @@ export default function Sidebar() {
 
 const makeStyles = (colors) => StyleSheet.create({
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
-  panel: { position: 'absolute', top: 0, bottom: 0, left: 0, backgroundColor: RED, paddingHorizontal: 16 },
+  panel: { position: 'absolute', top: 0, bottom: 0, left: 0, backgroundColor: '#210913', overflow: 'hidden' },
+  panelImage: { flex: 1 },
+  panelImageArt: { opacity: 0.94 },
+  panelContent: { flex: 1, paddingHorizontal: 16, backgroundColor: 'rgba(20,4,13,0.16)' },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
   logoDot: { width: 32, height: 32, borderRadius: 16, backgroundColor: ON, alignItems: 'center', justifyContent: 'center' },
   brand: { color: ON, fontFamily: fonts.bold, fontSize: 18 },
