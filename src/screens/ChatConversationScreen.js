@@ -352,6 +352,12 @@ export default function ChatConversationScreen({ navigation, route }) {
         const body = d.configured ? (d.text || d.error || 'No result.') : (d.notice || 'Research is not set up yet.');
         const src = (d.sources && d.sources.length) ? '\n\nSources:\n' + d.sources.slice(0, 5).join('\n') : '';
         setMessages([...next, { role: 'assistant', content: body + src, model: 'Research' }]);
+        // Read only the answer aloud. Source URLs are useful on screen but should
+        // never be sent to TTS, especially for voice-originated requests.
+        if (fromVoice && body) {
+          const spoken = await speakText(body, token);
+          if (!spoken?.ok) notify(t('notifFailed'), spoken?.error || 'Voice playback could not start.', 'warn');
+        }
       } else if (att && att.kind === 'photo') {
         const history = next.map((m, i) => ({ role: m.role, content: i === next.length - 1 ? (text || 'What is in this image?') : (typeof m.content === 'string' ? m.content : '') }));
         const d = await api.aiChat({ tier: mode, skill, messages: history, images: [{ base64: att.base64, mimeType: att.mimeType }], lang }, token, signal);
@@ -366,7 +372,10 @@ export default function ChatConversationScreen({ navigation, route }) {
         const payload = { model: 'auto', tier: mode, effort: mode === 'smart' ? 'deep' : 'quick', skill, messages: msgs, lang };
         const d = await api.chat(payload, token, signal);
         setMessages([...next, { role: 'assistant', content: d.reply, model: d.modelLabel }]);
-        if (fromVoice && d.reply) speakText(d.reply, token);
+        if (fromVoice && d.reply) {
+          const spoken = await speakText(d.reply, token);
+          if (!spoken?.ok) notify(t('notifFailed'), spoken?.message || 'Could not play the spoken reply.', 'error');
+        }
       }
     } catch (e) {
       if (e.name === 'AbortError') setMessages(next);
@@ -800,4 +809,3 @@ const makeStyles = (colors) => StyleSheet.create({
     textAlign: 'center', marginTop: 8, paddingHorizontal: 20, lineHeight: 14,
   },
 });
-

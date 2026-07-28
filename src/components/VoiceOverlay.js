@@ -177,8 +177,12 @@ export default function VoiceOverlay({ visible, onClose, token, lang = 'en', use
       if (!runningRef.current) return;
       setStatus('speaking');
       const t2 = Date.now();
-      await speakText(answer, token, () => { if (runningRef.current) listen(); });
+      const spoken = await speakText(answer, token, () => { if (runningRef.current) listen(); });
       setTiming(x => ({ ...x, tts: Date.now() - t2 }));
+      if (!spoken?.ok) {
+        setError(spoken?.message || 'Could not play the spoken reply.');
+        if (runningRef.current) listen();
+      }
     } catch (e) {
       setError(e.message || 'Voice error');
       if (runningRef.current) listen();
