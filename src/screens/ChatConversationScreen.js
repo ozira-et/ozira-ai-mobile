@@ -776,8 +776,8 @@ const makeStyles = (colors) => StyleSheet.create({
   bubble: { maxWidth: '86%', padding: 12, borderRadius: 16, marginBottom: 12 },
   user: { alignSelf: 'flex-end', backgroundColor: colors.card, borderBottomRightRadius: 4 },
   ai: {
-    alignSelf: 'flex-start', backgroundColor: colors.surface,
-    borderWidth: 1, borderColor: colors.border, borderBottomLeftRadius: 4,
+    alignSelf: 'stretch', maxWidth: '100%', backgroundColor: 'transparent', borderWidth: 0,
+    paddingHorizontal: 2, paddingVertical: 8,
   },
   who: { color: colors.primary, fontFamily: fonts.semibold, fontSize: 11.5, marginBottom: 5 },
   msgTxt: { color: colors.text, fontFamily: fonts.regular, fontSize: 15, lineHeight: 22 },
