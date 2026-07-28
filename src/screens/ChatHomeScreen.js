@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, ImageBackground } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -79,16 +79,18 @@ export default function ChatHomeScreen({ navigation }) {
         <Text style={styles.hello}>Hello, {user?.name?.split(' ')[0] || 'there'}</Text>
         <Text style={styles.helloSub}>How can I help you today?</Text>
 
-        <View style={styles.dayCard}>
-          <Text style={styles.dayDate}>🗓  {ethiopianDateString()} · Ethiopian calendar</Text>
-          {isBirthday ? <Text style={styles.bday}>🎉 Happy birthday, {firstName}! Wishing you a wonderful year.</Text> : null}
-          {profile.showZodiac !== false && zodiac ? (
-            <View style={styles.horo}>
-              <Text style={styles.horoSign}>{zodiac.emoji}  {zodiac.name} · today</Text>
-              <Text style={styles.horoTxt}>{horoscope || 'Set your birthday in Profile to see your daily horoscope.'}</Text>
-            </View>
-          ) : null}
-        </View>
+        <ImageBackground source={require('../../assets/sidebar-artistic-gradient.png')} style={styles.dayCard} imageStyle={styles.dayCardArt}>
+          <View style={styles.dayCardOverlay}>
+            <Text style={styles.dayDate}>🗓  {ethiopianDateString()} · Ethiopian calendar</Text>
+            {isBirthday ? <Text style={styles.bday}>🎉 Happy birthday, {firstName}! Wishing you a wonderful year.</Text> : null}
+            {profile.showZodiac !== false && zodiac ? (
+              <View style={styles.horo}>
+                <Text style={styles.horoSign}>{zodiac.emoji}  {zodiac.name} · today</Text>
+                <Text style={styles.horoTxt}>{horoscope || 'Set your birthday in Profile to see your daily horoscope.'}</Text>
+              </View>
+            ) : null}
+          </View>
+        </ImageBackground>
 
         <View style={styles.grid}>
           {QUICK.map(q => (
@@ -128,12 +130,14 @@ const makeStyles = (colors) => StyleSheet.create({
   brand: { color: colors.text, fontFamily: fonts.bold, fontSize: 18 },
   hello: { color: colors.text, fontFamily: fonts.bold, fontSize: 24 },
   helloSub: { color: colors.muted, fontFamily: fonts.regular, fontSize: 14.5, marginTop: 4, marginBottom: 18 },
-  dayCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: 14, marginBottom: 18 },
-  dayDate: { color: colors.text, fontFamily: fonts.medium, fontSize: 13.5 },
+  dayCard: { backgroundColor: '#250914', borderWidth: 1, borderColor: colors.primary + '66', borderRadius: radius.lg, marginBottom: 18, overflow: 'hidden' },
+  dayCardArt: { opacity: 0.82 },
+  dayCardOverlay: { padding: 14, backgroundColor: 'rgba(27,5,15,0.30)' },
+  dayDate: { color: colors.white, fontFamily: fonts.medium, fontSize: 13.5 },
   bday: { color: colors.gold, fontFamily: fonts.semibold, fontSize: 13.5, marginTop: 8 },
-  horo: { marginTop: 10, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10 },
-  horoSign: { color: colors.primary, fontFamily: fonts.semibold, fontSize: 13 },
-  horoTxt: { color: colors.muted, fontFamily: fonts.regular, fontSize: 13, lineHeight: 19, marginTop: 4 },
+  horo: { marginTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.24)', paddingTop: 10 },
+  horoSign: { color: '#FFD76A', fontFamily: fonts.semibold, fontSize: 13 },
+  horoTxt: { color: 'rgba(255,255,255,0.82)', fontFamily: fonts.regular, fontSize: 13, lineHeight: 19, marginTop: 4 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   tile: {
     width: '47%', flexGrow: 1, backgroundColor: colors.surface,

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, Image, Keyboard, Platform, ActivityIndicator, Modal, Alert, Share } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, Image, ImageBackground, Keyboard, Platform, ActivityIndicator, Modal, Alert, Share } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -448,8 +448,9 @@ export default function ChatConversationScreen({ navigation, route }) {
       <ScrollView ref={scrollRef} contentContainerStyle={{ padding: 16, paddingBottom: 16 }} onContentSizeChange={scrollDown}>
         {messages.length === 0 && (
           <View style={styles.empty}>
-            {/* Red hero card — mirrors the sidebar's brand look. */}
-            <View style={styles.hero}>
+            {/* The same artwork as the sidebar gives the empty-chat home a connected look. */}
+            <ImageBackground source={require('../../assets/sidebar-artistic-gradient.png')} style={styles.hero} imageStyle={styles.heroArt}>
+              <View style={styles.heroInner}>
               <View style={styles.heroLogo}>
                 {imageMode ? <Ionicons name="image" size={34} color={PRIMARY_RED} /> : <Logo size={44} />}
               </View>
@@ -464,7 +465,8 @@ export default function ChatConversationScreen({ navigation, route }) {
               <Text style={styles.heroSub}>
                 {imageMode ? 'Describe an image to generate.' : t('emptyHint')}
               </Text>
-            </View>
+              </View>
+            </ImageBackground>
 
             {!imageMode && (
               <View style={styles.sugWrap}>
@@ -738,9 +740,10 @@ const makeStyles = (colors) => StyleSheet.create({
   convDivider: { height: 1, backgroundColor: colors.border, marginVertical: 4 },
   empty: { marginTop: 18, gap: 18 },
   hero: {
-    backgroundColor: PRIMARY_RED, borderRadius: 26, alignItems: 'center',
-    paddingVertical: 26, paddingHorizontal: 22, gap: 11,
+    backgroundColor: '#250914', borderRadius: 26, overflow: 'hidden',
   },
+  heroArt: { opacity: 0.92 },
+  heroInner: { alignItems: 'center', paddingVertical: 26, paddingHorizontal: 22, gap: 11, backgroundColor: 'rgba(28,5,16,0.18)' },
   heroLogo: {
     width: 68, height: 68, borderRadius: 34, backgroundColor: '#FFFFFF',
     alignItems: 'center', justifyContent: 'center',
