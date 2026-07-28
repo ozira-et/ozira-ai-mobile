@@ -487,12 +487,19 @@ export default function ChatConversationScreen({ navigation, route }) {
         )}
         {messages.map((m, i) => (
           <View key={i} style={[styles.bubble, m.role === 'user' ? styles.user : styles.ai]}>
-            {m.role === 'assistant' && <Text style={styles.who}>{m.image ? 'Image' : 'OZIRA'}</Text>}
+            {m.role === 'assistant' && !m.pending && <Text style={styles.who}>{m.image ? 'Image' : 'OZIRA'}</Text>}
             {m.thumb ? <Image source={{ uri: m.thumb }} style={styles.thumb} /> : null}
             {m.image ? (
               <Image source={{ uri: m.image }} style={styles.image} resizeMode="cover" />
             ) : m.pending ? (
-              <ActivityIndicator color={colors.muted} />
+              <View style={styles.thinkingRow} accessibilityLabel={t('vThinking')}>
+                <Text style={styles.thinkingTxt}>{t('vThinking').replace('…', '')}</Text>
+                <View style={styles.thinkingDots}>
+                  <View style={[styles.thinkingDot, { backgroundColor: FLAG.green }]} />
+                  <View style={[styles.thinkingDot, { backgroundColor: FLAG.yellow }]} />
+                  <View style={[styles.thinkingDot, { backgroundColor: FLAG.red }]} />
+                </View>
+              </View>
             ) : m.role === 'assistant' ? (
               // AI answers are markdown — render them as a formatted result,
               // not raw ** and ## in a chat bubble.
@@ -780,6 +787,10 @@ const makeStyles = (colors) => StyleSheet.create({
     paddingHorizontal: 2, paddingVertical: 8,
   },
   who: { color: colors.primary, fontFamily: fonts.semibold, fontSize: 11.5, marginBottom: 5 },
+  thinkingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 30 },
+  thinkingTxt: { color: colors.muted, fontFamily: fonts.medium, fontSize: 13 },
+  thinkingDots: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  thinkingDot: { width: 7, height: 7, borderRadius: 4 },
   msgTxt: { color: colors.text, fontFamily: fonts.regular, fontSize: 15, lineHeight: 22 },
   speakBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8, alignSelf: 'flex-start' },
   speakTxt: { color: colors.muted, fontFamily: fonts.medium, fontSize: 12 },
