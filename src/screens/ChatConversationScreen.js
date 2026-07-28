@@ -24,6 +24,11 @@ import { speakText, stopSpeaking } from '../tts';
 
 const FLAG = { green: '#078930', yellow: '#FCDD09', red: '#DA121A' };
 const PRIMARY_RED = '#B3121B';
+const RESPONSE_LEVELS = [
+  { id: 'quick', label: 'Instant', sub: 'Shortest and fastest reply', icon: 'flash' },
+  { id: 'balanced', label: 'Medium', sub: 'Balanced detail and speed', icon: 'remove' },
+  { id: 'deep', label: 'High', sub: 'Most complete answer', icon: 'sparkles' },
+];
 
 // Starter prompts shown on the empty chat screen (translated via i18n keys).
 const SUGGESTIONS = [
@@ -57,6 +62,7 @@ export default function ChatConversationScreen({ navigation, route }) {
   const [input, setInput] = useState('');
   const [imageMode, setImageMode] = useState(!!route.params?.imageMode);
   const [mode, setMode] = useState('fast'); // 'fast' | 'smart'
+  const [effort, setEffort] = useState('quick'); // Instant | Medium | High
   const [menuOpen, setMenuOpen] = useState(false);
   const [attachment, setAttachment] = useState(null); // { kind:'photo'|'file', name, base64, mimeType, text }
   const [research, setResearch] = useState(false);
@@ -70,6 +76,7 @@ export default function ChatConversationScreen({ navigation, route }) {
   const instrRef = useRef('');
   const [kb, setKb] = useState(0);
   const [modeOpen, setModeOpen] = useState(false);     // Fast/Smart dropdown
+  const [effortOpen, setEffortOpen] = useState(false); // Instant/Medium/High dropdown
   const [convMenu, setConvMenu] = useState(false);     // top-right ⋯ menu
   const [pinned, setPinned] = useState(false);
   const [folderPick, setFolderPick] = useState(null);  // list of folders when picking
@@ -369,7 +376,7 @@ export default function ChatConversationScreen({ navigation, route }) {
         }
         const msgs = next.map((m, i) => ({ role: m.role, content: i === next.length - 1 ? lastContent : (typeof m.content === 'string' ? m.content : '') }));
         if (instrRef.current) msgs.unshift({ role: 'system', content: instrRef.current });
-        const payload = { model: 'auto', tier: mode, effort: mode === 'smart' ? 'deep' : 'quick', skill, messages: msgs, lang };
+        const payload = { model: 'auto', tier: mode, effort, skill, messages: msgs, lang };
         const d = await api.chat(payload, token, signal);
         setMessages([...next, { role: 'assistant', content: d.reply, model: d.modelLabel }]);
         if (fromVoice && d.reply) {
@@ -390,10 +397,15 @@ export default function ChatConversationScreen({ navigation, route }) {
     <View style={{ flex: 1, backgroundColor: colors.bg, paddingBottom: kb }}>
       <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
         <FlagMenu onPress={openSidebar} size={22} />
-        <Pressable onPress={() => setModeOpen(o => !o)} style={styles.modeSel}>
+        <Pressable onPress={() => { setModeOpen(o => !o); setEffortOpen(false); }} style={styles.modeSel}>
           <Ionicons name={mode === 'smart' ? 'sparkles' : 'flash'} size={13} color={mode === 'smart' ? colors.accent : colors.primary} />
           <Text style={styles.modeSelTxt}>{mode === 'smart' ? t('smart') : t('fast')}</Text>
           <Ionicons name={modeOpen ? 'chevron-up' : 'chevron-down'} size={13} color={colors.muted} />
+        </Pressable>
+        <Pressable onPress={() => { setEffortOpen(o => !o); setModeOpen(false); }} style={styles.effortSel}>
+          <Ionicons name={effort === 'deep' ? 'sparkles' : effort === 'balanced' ? 'remove' : 'flash'} size={13} color={effort === 'deep' ? colors.accent : colors.primary} />
+          <Text style={styles.modeSelTxt}>{RESPONSE_LEVELS.find(x => x.id === effort)?.label || 'Instant'}</Text>
+          <Ionicons name={effortOpen ? 'chevron-up' : 'chevron-down'} size={13} color={colors.muted} />
         </Pressable>
         <Text style={styles.title} numberOfLines={1}>{route.params?.title || (imageMode ? 'Image Generator' : '')}</Text>
         <Pressable onPress={() => setConvMenu(true)} hitSlop={10}>
@@ -419,6 +431,22 @@ export default function ChatConversationScreen({ navigation, route }) {
             </View>
             {mode === 'smart' && <Ionicons name="checkmark" size={16} color={colors.accent} />}
           </Pressable>
+        </View>
+      )}
+
+      {effortOpen && (
+        <View style={styles.effortDrop}>
+          <Text style={styles.dropLabel}>Reply depth</Text>
+          {RESPONSE_LEVELS.map(level => (
+            <Pressable key={level.id} onPress={() => { setEffort(level.id); setEffortOpen(false); }} style={[styles.modeDropRow, effort === level.id && styles.modeDropOn]}>
+              <Ionicons name={level.icon} size={15} color={level.id === 'deep' ? colors.accent : colors.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modeDropTitle}>{level.label}</Text>
+                <Text style={styles.modeDropSub}>{level.sub}</Text>
+              </View>
+              {effort === level.id && <Ionicons name="checkmark" size={16} color={colors.primary} />}
+            </Pressable>
+          ))}
         </View>
       )}
 
@@ -685,6 +713,11 @@ const makeStyles = (colors) => StyleSheet.create({
     backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
     borderRadius: 999, paddingHorizontal: 11, paddingVertical: 6,
   },
+  effortSel: {
+    flexDirection: 'row', alignItems: 'center', gap: 5, marginLeft: 6,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: 999, paddingHorizontal: 9, paddingVertical: 6,
+  },
   modeSelTxt: { color: colors.text, fontFamily: fonts.semibold, fontSize: 12.5 },
   modeDrop: {
     position: 'absolute', top: 0, left: 12, zIndex: 50, marginTop: 92,
@@ -692,6 +725,13 @@ const makeStyles = (colors) => StyleSheet.create({
     borderRadius: 14, padding: 6, width: 250,
     shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8,
   },
+  effortDrop: {
+    position: 'absolute', top: 0, right: 12, zIndex: 50, marginTop: 92,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: 14, padding: 6, width: 230,
+    shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8,
+  },
+  dropLabel: { color: colors.muted, fontFamily: fonts.semibold, fontSize: 11, paddingHorizontal: 10, paddingTop: 7, paddingBottom: 3, textTransform: 'uppercase' },
   modeDropRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 10 },
   modeDropOn: { backgroundColor: colors.card },
   modeDropTitle: { color: colors.text, fontFamily: fonts.semibold, fontSize: 14 },
