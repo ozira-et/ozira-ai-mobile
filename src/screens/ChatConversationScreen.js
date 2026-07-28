@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, Image, ImageBackground, Keyboard, Platform, ActivityIndicator, Modal, Alert, Share } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, Image, ImageBackground, Keyboard, Platform, ActivityIndicator, Modal, Alert, Share, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -30,6 +30,24 @@ const RESPONSE_LEVEL_IDS = [
   { id: 'balanced', icon: 'remove' },
   { id: 'deep', icon: 'sparkles' },
 ];
+
+function ThinkingDots() {
+  const values = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]).current;
+  useEffect(() => {
+    const animations = values.map((value, index) => Animated.loop(Animated.sequence([
+      Animated.delay(index * 150),
+      Animated.timing(value, { toValue: 1, duration: 210, useNativeDriver: true }),
+      Animated.timing(value, { toValue: 0, duration: 210, useNativeDriver: true }),
+      Animated.delay(260),
+    ])));
+    animations.forEach(animation => animation.start());
+    return () => animations.forEach(animation => animation.stop());
+  }, [values]);
+  return <View style={stylesForThinking.dots}>{[FLAG.green, FLAG.yellow, FLAG.red].map((color, index) => (
+    <Animated.View key={color} style={[stylesForThinking.dot, { backgroundColor: color, transform: [{ translateY: values[index].interpolate({ inputRange: [0, 1], outputRange: [0, -5] }) }, { scale: values[index].interpolate({ inputRange: [0, 1], outputRange: [1, 1.22] }) }] }]} />
+  ))}</View>;
+}
+const stylesForThinking = StyleSheet.create({ dots: { flexDirection: 'row', alignItems: 'center', gap: 5 }, dot: { width: 7, height: 7, borderRadius: 4 } });
 
 // Starter prompts shown on the empty chat screen (translated via i18n keys).
 const SUGGESTIONS = [
@@ -494,11 +512,7 @@ export default function ChatConversationScreen({ navigation, route }) {
             ) : m.pending ? (
               <View style={styles.thinkingRow} accessibilityLabel={t('vThinking')}>
                 <Text style={styles.thinkingTxt}>{t('vThinking').replace('…', '')}</Text>
-                <View style={styles.thinkingDots}>
-                  <View style={[styles.thinkingDot, { backgroundColor: FLAG.green }]} />
-                  <View style={[styles.thinkingDot, { backgroundColor: FLAG.yellow }]} />
-                  <View style={[styles.thinkingDot, { backgroundColor: FLAG.red }]} />
-                </View>
+                <ThinkingDots />
               </View>
             ) : m.role === 'assistant' ? (
               // AI answers are markdown — render them as a formatted result,
@@ -789,8 +803,6 @@ const makeStyles = (colors) => StyleSheet.create({
   who: { color: colors.primary, fontFamily: fonts.semibold, fontSize: 11.5, marginBottom: 5 },
   thinkingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 30 },
   thinkingTxt: { color: colors.muted, fontFamily: fonts.medium, fontSize: 13 },
-  thinkingDots: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  thinkingDot: { width: 7, height: 7, borderRadius: 4 },
   msgTxt: { color: colors.text, fontFamily: fonts.regular, fontSize: 15, lineHeight: 22 },
   speakBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8, alignSelf: 'flex-start' },
   speakTxt: { color: colors.muted, fontFamily: fonts.medium, fontSize: 12 },
