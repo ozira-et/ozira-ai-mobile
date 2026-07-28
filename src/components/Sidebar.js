@@ -2,7 +2,7 @@
 // Plain built-in Animated (no Reanimated), and it does NOT transform the app
 // content — that was crashing Android.
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, Animated, Dimensions, TextInput, Modal, Alert, Image, ImageBackground } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, Animated, Dimensions, TextInput, Modal, Alert, Image, ImageBackground, PanResponder } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -35,6 +35,8 @@ export default function Sidebar() {
   const { t, rtl } = useLang();
   const tx = useRef(new Animated.Value(-WIDTH)).current;
   const fade = useRef(new Animated.Value(0)).current;
+  const openRef = useRef(sidebarOpen); openRef.current = sidebarOpen;
+  const closeRef = useRef(closeSidebar); closeRef.current = closeSidebar;
   const [convs, setConvs] = useState([]);
   const [folders, setFolders] = useState([]);
   const [activeFolder, setActiveFolder] = useState(null);
@@ -42,6 +44,31 @@ export default function Sidebar() {
   const [folderName, setFolderName] = useState('');
   const [moveConv, setMoveConv] = useState(null);
   const [profile, setProfileState] = useState({});
+
+  // A real curtain-like drawer: the user can pull it closed and release at
+  // any position. Small drags spring back; a decisive drag completes the close.
+  const drawerPan = useRef(PanResponder.create({
+    onStartShouldSetPanResponder: () => false,
+    onMoveShouldSetPanResponder: (_event, gesture) => openRef.current && gesture.dx < -6 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
+    onPanResponderGrant: () => { tx.stopAnimation(); fade.stopAnimation(); },
+    onPanResponderMove: (_event, gesture) => {
+      const next = Math.max(-WIDTH, Math.min(0, gesture.dx));
+      tx.setValue(next);
+      fade.setValue(1 + next / WIDTH);
+    },
+    onPanResponderRelease: (_event, gesture) => {
+      const shouldClose = gesture.dx < -WIDTH * 0.30 || gesture.vx < -0.35;
+      if (shouldClose) closeRef.current();
+      else Animated.parallel([
+        Animated.spring(tx, { toValue: 0, useNativeDriver: true, bounciness: 4 }),
+        Animated.timing(fade, { toValue: 1, duration: 140, useNativeDriver: true }),
+      ]).start();
+    },
+    onPanResponderTerminate: () => Animated.parallel([
+      Animated.spring(tx, { toValue: 0, useNativeDriver: true, bounciness: 4 }),
+      Animated.timing(fade, { toValue: 1, duration: 140, useNativeDriver: true }),
+    ]).start(),
+  })).current;
 
   const refresh = useCallback(async () => {
     try {
@@ -107,7 +134,7 @@ export default function Sidebar() {
         <Pressable style={{ flex: 1 }} onPress={closeSidebar} />
       </Animated.View>
 
-      <Animated.View style={[styles.panel, { width: WIDTH, paddingTop: insets.top + 8, transform: [{ translateX: tx }] }]}>
+      <Animated.View {...drawerPan.panHandlers} style={[styles.panel, { width: WIDTH, paddingTop: insets.top + 8, transform: [{ translateX: tx }] }]}>
         <ImageBackground source={require('../../assets/sidebar-artistic-gradient.png')} style={styles.panelImage} imageStyle={styles.panelImageArt}>
         <LinearGradient pointerEvents="none" colors={['rgba(8,2,7,0)', 'rgba(8,2,7,0.78)']} locations={[0, 1]} style={styles.bottomShade} />
         <View style={styles.panelContent}>
