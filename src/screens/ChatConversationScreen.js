@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, Image, ImageB
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
+import { LinearGradient } from 'expo-linear-gradient';
 import { colors, fonts, radius } from '../theme';
 import { useColors } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -607,8 +608,10 @@ export default function ChatConversationScreen({ navigation, route }) {
               <Ionicons name="arrow-up" size={20} color={colors.white} />
             </Pressable>
           ) : (
-            <Pressable onPress={() => setVoiceOpen(true)} style={styles.voiceBtn}>
-              <Ionicons name="mic" size={22} color={colors.white} />
+            <Pressable onPress={() => setVoiceOpen(true)} style={styles.voiceBtn} accessibilityRole="button" accessibilityLabel="Start live voice conversation">
+              <LinearGradient colors={[colors.primary, colors.secondary]} start={{ x: 0, y: 1 }} end={{ x: 1, y: 0 }} style={styles.voiceWave}>
+                <Ionicons name="pulse" size={23} color={colors.white} />
+              </LinearGradient>
             </Pressable>
           )}
         </View>
@@ -828,9 +831,10 @@ const makeStyles = (colors) => StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   voiceBtn: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary,
-    alignItems: 'center', justifyContent: 'center',
+    width: 48, height: 48, borderRadius: 24, overflow: 'hidden', elevation: 4,
+    shadowColor: colors.primary, shadowOpacity: 0.35, shadowRadius: 8, shadowOffset: { width: 0, height: 3 },
   },
+  voiceWave: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   stopBtn: {
     width: 44, height: 44, borderRadius: 22, backgroundColor: colors.danger,
     alignItems: 'center', justifyContent: 'center',
