@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Linking, Alert, Switch, ImageBackground } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Linking, Alert, Switch, ImageBackground, Modal, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { fonts, radius } from '../theme';
@@ -31,6 +31,9 @@ export default function SettingsScreen() {
   const { openSidebar } = useUI();
   const { notify, setNotifyEnabled } = useNotify();
   const [st, setSt] = useState({ saveHistory: true, improveModel: false, voice: 'Kore', notify: true });
+  const [sessionsOpen, setSessionsOpen] = useState(false);
+  const [sessions, setSessions] = useState([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
 
   useEffect(() => { (async () => {
     const local = await getSettings();
@@ -46,6 +49,24 @@ export default function SettingsScreen() {
     setSt(prev => ({ ...prev, ...patch }));
     saveSettings(patch);
     api.saveSettings(patch, token).catch(() => {});
+  }
+  async function openSessions() {
+    setSessionsOpen(true); setSessionsLoading(true);
+    try { const data = await api.sessions(token); setSessions(data.sessions || []); }
+    catch (e) { Alert.alert('Sessions', e.message); }
+    setSessionsLoading(false);
+  }
+  function removeSession(session) {
+    Alert.alert('Remove device?', 'This device will lose access to your OZIRA account.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: async () => {
+        try {
+          const result = await api.revokeSession(session.id, token);
+          setSessions(prev => prev.filter(s => s.id !== session.id));
+          if (result.current) { setSessionsOpen(false); await signOut(); }
+        } catch (e) { Alert.alert('Could not remove device', e.message); }
+      } },
+    ]);
   }
   function purge() {
     Alert.alert('Purge all history', 'Permanently delete ALL your chats on this device? This cannot be undone.', [
@@ -166,6 +187,11 @@ export default function SettingsScreen() {
             <Text style={[styles.rowLabel, { color: colors.danger }]}>{t('purgeHistory')}</Text>
             <Ionicons name={rtlIcon('chevron-forward', rtl)} size={17} color={colors.muted} />
           </Pressable>
+          <Pressable style={({ pressed }) => [styles.row, pressed && styles.rowPressed]} onPress={openSessions}>
+            <Ionicons name="shield-checkmark-outline" size={19} color={colors.primary} />
+            <View style={{ flex: 1 }}><Text style={[styles.rowLabel, rtlText(rtl)]}>Login & session management</Text><Text style={[styles.rowSub, rtlText(rtl)]}>Review devices and remove access</Text></View>
+            <Ionicons name={rtlIcon('chevron-forward', rtl)} size={17} color={colors.muted} />
+          </Pressable>
         </View>
 
         {/* ABOUT & SUPPORT — account, links, legal and version all merged. These
@@ -197,6 +223,14 @@ export default function SettingsScreen() {
 
         <Text style={[styles.note, rtlText(rtl)]}>{t('disclaimer')}</Text>
       </ScrollView>
+      <Modal visible={sessionsOpen} transparent animationType="slide" onRequestClose={() => setSessionsOpen(false)}>
+        <View style={styles.modalBg}><View style={styles.modalCard}>
+          <View style={styles.modalHead}><Text style={styles.modalTitle}>Active logins</Text><Pressable onPress={() => setSessionsOpen(false)} hitSlop={10}><Ionicons name="close" size={22} color={colors.muted} /></Pressable></View>
+          {sessionsLoading ? <ActivityIndicator color={colors.primary} style={{ margin: 22 }} /> : sessions.length === 0 ? <Text style={styles.rowSub}>No device sessions found yet.</Text> : sessions.map(s => (
+            <View key={s.id} style={styles.sessionRow}><Ionicons name={s.label.includes('Web') ? 'globe-outline' : 'phone-portrait-outline'} size={20} color={colors.primary} /><View style={{ flex: 1 }}><Text style={styles.rowLabel}>{s.label}{s.current ? ' · This device' : ''}</Text><Text style={styles.rowSub}>Last active {new Date(s.lastSeenAt).toLocaleString()}</Text></View><Pressable onPress={() => removeSession(s)} hitSlop={8}><Ionicons name="trash-outline" size={20} color={colors.danger} /></Pressable></View>
+          ))}
+        </View></View>
+      </Modal>
     </View>
   );
 }
@@ -240,4 +274,9 @@ const makeStyles = (colors) => StyleSheet.create({
   },
   logoutTxt: { color: colors.danger, fontFamily: fonts.semibold, fontSize: 14 },
   note: { color: colors.muted, fontFamily: fonts.regular, fontSize: 11.5, textAlign: 'center', marginTop: 18, lineHeight: 16 },
+  modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.52)', justifyContent: 'flex-end' },
+  modalCard: { backgroundColor: colors.surface, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: 18, paddingBottom: 32, maxHeight: '72%' },
+  modalHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  modalTitle: { color: colors.text, fontFamily: fonts.semibold, fontSize: 17 },
+  sessionRow: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: colors.border },
 });

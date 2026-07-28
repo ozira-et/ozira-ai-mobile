@@ -1,7 +1,19 @@
 import { config } from './config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 
 let authToken = null;
 export function setToken(t) { authToken = t; }
+let deviceId = null;
+async function getDeviceId() {
+  if (deviceId) return deviceId;
+  deviceId = await AsyncStorage.getItem('ozira_device_id');
+  if (!deviceId) {
+    deviceId = 'm_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 18);
+    await AsyncStorage.setItem('ozira_device_id', deviceId);
+  }
+  return deviceId;
+}
 
 // The app language, mirrored here so voice calls can carry it without every
 // caller threading it through. Amharic/Afaan Oromo route to the native Addis AI
@@ -10,10 +22,13 @@ let currentLang = 'en';
 export function setApiLang(l) { if (l) currentLang = l; }
 
 async function req(path, { method, body, token, signal } = {}) {
+  const sessionDeviceId = await getDeviceId();
   const res = await fetch(config.API_BASE + path, {
     method: method || (body ? 'POST' : 'GET'),
     headers: {
       'content-type': 'application/json',
+      'x-ozira-device-id': sessionDeviceId,
+      'x-ozira-device-label': 'OZIRA Mobile · ' + (Platform.OS === 'ios' ? 'iPhone/iPad' : 'Android'),
       ...((token || authToken) ? { authorization: 'Bearer ' + (token || authToken) } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
@@ -85,6 +100,8 @@ export const api = {
   deleteAccount: (email, token) => req('/api/me/delete', { body: { confirm: email }, token }),
   usage: (token) => req('/api/usage', { token }),
   storage: (token) => req('/api/storage', { token }),
+  sessions: (token) => req('/api/sessions', { token }),
+  revokeSession: (id, token) => req('/api/sessions/revoke', { body: { id }, token }),
   // --- language ---
   settingsLang: (lang, token) => req('/api/settings/lang', { body: { lang }, token }),
   settings: (token) => req('/api/settings', { token }),
