@@ -397,7 +397,7 @@ export default function ChatConversationScreen({ navigation, route }) {
       <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
         <FlagMenu onPress={openSidebar} size={22} />
         <Pressable onPress={() => setModeOpen(o => !o)} style={styles.modeSel}>
-          <Ionicons name={mode === 'smart' ? 'sparkles' : 'flash'} size={13} color={mode === 'smart' ? colors.accent : colors.primary} />
+          <Ionicons name={mode === 'smart' ? 'sparkles' : 'flash'} size={13} color={colors.primary} />
           <Text style={styles.modeSelTxt}>{mode === 'smart' ? t('smart') : t('fast')} · {RESPONSE_LEVELS.find(x => x.id === effort)?.label || 'Instant'}</Text>
           <Ionicons name={modeOpen ? 'chevron-up' : 'chevron-down'} size={13} color={colors.muted} />
         </Pressable>
@@ -419,18 +419,18 @@ export default function ChatConversationScreen({ navigation, route }) {
             {mode === 'fast' && <Ionicons name="checkmark" size={16} color={colors.primary} />}
           </Pressable>
           <Pressable onPress={() => setMode('smart')} style={[styles.modeDropRow, mode === 'smart' && styles.modeDropOn]}>
-            <Ionicons name="sparkles" size={15} color={colors.accent} />
+            <Ionicons name="sparkles" size={15} color={colors.primary} />
             <View style={{ flex: 1 }}>
               <Text style={styles.modeDropTitle}>{t('smart')}</Text>
               <Text style={styles.modeDropSub}>{t('smartSub')}</Text>
             </View>
-            {mode === 'smart' && <Ionicons name="checkmark" size={16} color={colors.accent} />}
+            {mode === 'smart' && <Ionicons name="checkmark" size={16} color={colors.primary} />}
           </Pressable>
           <View style={styles.dropDivider} />
           <Text style={styles.dropLabel}>Choose reply depth</Text>
           {RESPONSE_LEVELS.map(level => (
             <Pressable key={level.id} onPress={() => setEffort(level.id)} style={[styles.modeDropRow, effort === level.id && styles.modeDropOn]}>
-              <Ionicons name={level.icon} size={15} color={level.id === 'deep' ? colors.accent : colors.primary} />
+              <Ionicons name={level.icon} size={15} color={colors.primary} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.modeDropTitle}>{level.label}</Text>
                 <Text style={styles.modeDropSub}>{level.sub}</Text>
@@ -708,14 +708,14 @@ const makeStyles = (colors) => StyleSheet.create({
   modeDrop: {
     position: 'absolute', top: 0, left: 12, zIndex: 50, marginTop: 92,
     // Nearly transparent: it remains readable while letting the chat show through.
-    backgroundColor: colors.bg + 'D9', borderWidth: 1, borderColor: colors.border + 'BB',
+    backgroundColor: colors.bg + 'D9', borderWidth: 1, borderColor: colors.primary + '88',
     borderRadius: 10, padding: 3, width: 210, overflow: 'hidden',
     shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8,
   },
-  dropLabel: { color: colors.muted, fontFamily: fonts.semibold, fontSize: 9, paddingHorizontal: 7, paddingTop: 4, paddingBottom: 1, textTransform: 'uppercase' },
-  dropDivider: { height: 1, backgroundColor: colors.border + 'AA', marginVertical: 2 },
+  dropLabel: { color: colors.primary, fontFamily: fonts.semibold, fontSize: 9, paddingHorizontal: 7, paddingTop: 4, paddingBottom: 1, textTransform: 'uppercase' },
+  dropDivider: { height: 1, backgroundColor: colors.primary + '44', marginVertical: 2 },
   modeDropRow: { flexDirection: 'row', alignItems: 'center', gap: 7, padding: 6, borderRadius: 7 },
-  modeDropOn: { backgroundColor: colors.card + 'B3' },
+  modeDropOn: { backgroundColor: colors.primary + '22' },
   modeDropTitle: { color: colors.text, fontFamily: fonts.semibold, fontSize: 12 },
   modeDropSub: { color: colors.muted, fontFamily: fonts.regular, fontSize: 9.5, marginTop: 1 },
   actionRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 },
