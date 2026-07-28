@@ -412,6 +412,7 @@ export default function ChatConversationScreen({ navigation, route }) {
         </Pressable>
       </View>
 
+      {modeOpen && <Pressable style={styles.modeDismiss} onPress={() => setModeOpen(false)} />}
       {modeOpen && (
         <View style={styles.modeDrop}>
           <Text style={styles.dropLabel}>{t('chooseModel')}</Text>
@@ -721,6 +722,7 @@ const makeStyles = (colors) => StyleSheet.create({
     borderRadius: 10, padding: 3, width: 210, overflow: 'hidden',
     shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8,
   },
+  modeDismiss: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 49 },
   dropLabel: { color: colors.primary, fontFamily: fonts.semibold, fontSize: 9, paddingHorizontal: 7, paddingTop: 4, paddingBottom: 1, textTransform: 'uppercase' },
   dropDivider: { height: 1, backgroundColor: colors.primary + '44', marginVertical: 2 },
   modeDropRow: { flexDirection: 'row', alignItems: 'center', gap: 7, padding: 6, borderRadius: 7 },
