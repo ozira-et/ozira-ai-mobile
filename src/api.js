@@ -3,6 +3,12 @@ import { config } from './config';
 let authToken = null;
 export function setToken(t) { authToken = t; }
 
+// The app language, mirrored here so voice calls can carry it without every
+// caller threading it through. Amharic/Afaan Oromo route to the native Addis AI
+// voice on the backend; the value comes from LanguageContext.
+let currentLang = 'en';
+export function setApiLang(l) { if (l) currentLang = l; }
+
 async function req(path, { method, body, token, signal } = {}) {
   const res = await fetch(config.API_BASE + path, {
     method: method || (body ? 'POST' : 'GET'),
@@ -59,8 +65,8 @@ export const api = {
   aiCapabilities: (token) => req('/api/ai/capabilities', { token }),
   aiChat: (payload, token, signal) => req('/api/ai/chat', { body: payload, token, signal }),
   aiResearch: (query, token, signal) => req('/api/ai/research', { body: { query }, token, signal }),
-  aiTranscribe: (audio, mimeType, token) => req('/api/ai/transcribe', { body: { audio, mimeType }, token }),
-  aiSpeak: (text, token, voice) => req('/api/ai/speak', { body: { text, voice }, token }),
+  aiTranscribe: (audio, mimeType, token) => req('/api/ai/transcribe', { body: { audio, mimeType, lang: currentLang }, token }),
+  aiSpeak: (text, token, voice) => req('/api/ai/speak', { body: { text, voice, lang: currentLang }, token }),
   // --- teams ---
   team: (token) => req('/api/team', { token }),
   teamCreate: (name, token) => req('/api/team/create', { body: { name }, token }),

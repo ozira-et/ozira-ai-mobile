@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { getSettings, setSettings } from '../localStore';
 import { t as translate, isRTL } from '../i18n';
-import { api } from '../api';
+import { api, setApiLang } from '../api';
 import { useAuth } from './AuthContext';
 
 const LanguageContext = createContext(null);
@@ -15,11 +15,14 @@ export function LanguageProvider({ children }) {
 
   // Restore the saved language on boot.
   useEffect(() => {
-    (async () => { try { const s = await getSettings(); if (s && s.lang) setLangState(s.lang); } catch (_) {} })();
+    (async () => { try { const s = await getSettings(); if (s && s.lang) { setLangState(s.lang); setApiLang(s.lang); } } catch (_) {} })();
   }, []);
+  // Keep the api layer's copy in sync so voice calls carry the right language.
+  useEffect(() => { setApiLang(lang); }, [lang]);
 
   const setLang = useCallback(async (code) => {
     setLangState(code);
+    setApiLang(code);
     try { await setSettings({ lang: code }); } catch (_) {}
     try { if (token) await api.settingsLang(code, token); } catch (_) {} // best-effort backend sync
   }, [token]);
