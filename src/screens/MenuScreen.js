@@ -45,9 +45,10 @@ export default function MenuScreen({ navigation }) {
   const initial = (user?.name || user?.email || 'O').trim().charAt(0).toUpperCase();
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <ImageBackground source={require('../../assets/sidebar-artistic-gradient.png')} style={styles.screen} imageStyle={styles.screenArt}>
+      <View style={styles.screenOverlay}>
       <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={10}><Ionicons name={rtlIcon('chevron-back', rtl)} size={26} color={colors.text} /></Pressable>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={10}><Ionicons name={rtlIcon('chevron-back', rtl)} size={26} color={colors.white} /></Pressable>
         <Text style={styles.title}>{t('menu')}</Text>
         <View style={{ width: 26 }} />
       </View>
@@ -74,19 +75,23 @@ export default function MenuScreen({ navigation }) {
                   <Text style={[styles.rowLabel, rtlText(rtl)]}>{t(it.key)}</Text>
                   <Text style={[styles.rowSub, rtlText(rtl)]}>{t(it.key + 'Sub')}</Text>
                 </View>
-                <Ionicons name={rtlIcon('chevron-forward', rtl)} size={18} color={colors.muted} />
+                <Ionicons name={rtlIcon('chevron-forward', rtl)} size={18} color="rgba(255,255,255,0.68)" />
               </Pressable>
             ))}
           </View>
         ))}
       </ScrollView>
-    </View>
+      </View>
+    </ImageBackground>
   );
 }
 
 const makeStyles = (colors) => StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
-  title: { color: colors.text, fontFamily: fonts.semibold, fontSize: 17 },
+  screen: { flex: 1, backgroundColor: '#250914' },
+  screenArt: { opacity: 0.96 },
+  screenOverlay: { flex: 1, backgroundColor: 'rgba(23,4,14,0.18)' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.18)' },
+  title: { color: colors.white, fontFamily: fonts.semibold, fontSize: 17 },
   profile: { backgroundColor: '#250914', borderWidth: 1, borderColor: colors.primary + '66', borderRadius: radius.lg, marginBottom: 16, overflow: 'hidden' },
   profileArt: { opacity: 0.88 },
   profileInner: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, backgroundColor: 'rgba(26,4,15,0.22)' },
@@ -96,10 +101,10 @@ const makeStyles = (colors) => StyleSheet.create({
   email: { color: 'rgba(255,255,255,0.78)', fontFamily: fonts.regular, fontSize: 13, marginTop: 2 },
   sign: { color: '#FFD76A', fontFamily: fonts.semibold, fontSize: 13, marginTop: 2 },
   // Matches the section label in SettingsScreen so both screens group alike.
-  group: { color: colors.muted, fontFamily: fonts.semibold, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 14, marginBottom: 8 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: 14, marginBottom: 8, minHeight: 68 },
-  rowPressed: { backgroundColor: colors.cardAlt, borderColor: colors.primary + '66' },
+  group: { color: 'rgba(255,255,255,0.72)', fontFamily: fonts.semibold, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 14, marginBottom: 8 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(255,255,255,0.11)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', borderRadius: radius.lg, padding: 14, marginBottom: 8, minHeight: 68 },
+  rowPressed: { backgroundColor: 'rgba(255,255,255,0.20)', borderColor: '#FFD76A' },
   icon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  rowLabel: { color: colors.text, fontFamily: fonts.semibold, fontSize: 14.5, lineHeight: 20 },
-  rowSub: { color: colors.muted, fontFamily: fonts.regular, fontSize: 12.5, lineHeight: 17, marginTop: 1 },
+  rowLabel: { color: colors.white, fontFamily: fonts.semibold, fontSize: 14.5, lineHeight: 20 },
+  rowSub: { color: 'rgba(255,255,255,0.72)', fontFamily: fonts.regular, fontSize: 12.5, lineHeight: 17, marginTop: 1 },
 });
