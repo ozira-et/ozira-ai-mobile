@@ -30,7 +30,7 @@ export default function Sidebar() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { t, rtl } = useLang();
   const tx = useRef(new Animated.Value(-WIDTH)).current;
   const fade = useRef(new Animated.Value(0)).current;
@@ -50,17 +50,20 @@ export default function Sidebar() {
         : await listConversations(activeFolder));
       setProfileState(await getProfile());
     } catch (_) {}
-  }, [activeFolder]);
+  }, [activeFolder, token]);
 
   useEffect(() => {
     Animated.parallel([
       Animated.timing(tx, { toValue: sidebarOpen ? 0 : -WIDTH, duration: 240, useNativeDriver: true }),
       Animated.timing(fade, { toValue: sidebarOpen ? 1 : 0, duration: 240, useNativeDriver: true }),
     ]).start();
-    if (sidebarOpen) refresh();
   }, [sidebarOpen]);
 
-  useEffect(() => { if (sidebarOpen) refresh(); }, [activeFolder]);
+  // The drawer may already be open while Supabase restores the session. The
+  // first request then has no Authorization header and returns an empty list.
+  // Because refresh depends on token, this effect reruns when it arrives — no
+  // reload is needed.
+  useEffect(() => { if (sidebarOpen) refresh(); }, [sidebarOpen, refresh]);
 
   function go(route, params) { navigate(route, params); closeSidebar(); }
   function newChat() { go('ChatConversation', { conversationId: newId(), title: 'New Chat' }); }
