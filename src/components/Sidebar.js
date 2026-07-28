@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { View, Text, Pressable, StyleSheet, ScrollView, Animated, Dimensions, TextInput, Modal, Alert, Image, ImageBackground } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { fonts, radius } from '../theme';
 import { useColors } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -108,6 +109,7 @@ export default function Sidebar() {
 
       <Animated.View style={[styles.panel, { width: WIDTH, paddingTop: insets.top + 8, transform: [{ translateX: tx }] }]}>
         <ImageBackground source={require('../../assets/sidebar-artistic-gradient.png')} style={styles.panelImage} imageStyle={styles.panelImageArt}>
+        <LinearGradient pointerEvents="none" colors={['rgba(8,2,7,0)', 'rgba(8,2,7,0.78)']} locations={[0, 1]} style={styles.bottomShade} />
         <View style={styles.panelContent}>
         <View style={styles.topRow}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -203,6 +205,7 @@ const makeStyles = (colors) => StyleSheet.create({
   panel: { position: 'absolute', top: 0, bottom: 0, left: 0, backgroundColor: '#210913', overflow: 'hidden' },
   panelImage: { flex: 1 },
   panelImageArt: { opacity: 0.94 },
+  bottomShade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 245 },
   panelContent: { flex: 1, paddingHorizontal: 16, backgroundColor: 'rgba(20,4,13,0.16)' },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
   logoDot: { width: 32, height: 32, borderRadius: 16, backgroundColor: ON, alignItems: 'center', justifyContent: 'center' },
