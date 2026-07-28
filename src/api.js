@@ -87,4 +87,6 @@ export const api = {
   storage: (token) => req('/api/storage', { token }),
   // --- language ---
   settingsLang: (lang, token) => req('/api/settings/lang', { body: { lang }, token }),
+  settings: (token) => req('/api/settings', { token }),
+  saveSettings: (settings, token) => req('/api/settings', { body: { settings }, token }),
 };

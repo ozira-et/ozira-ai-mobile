@@ -32,8 +32,21 @@ export default function SettingsScreen() {
   const { notify, setNotifyEnabled } = useNotify();
   const [st, setSt] = useState({ saveHistory: true, improveModel: false, voice: 'Kore', notify: true });
 
-  useEffect(() => { (async () => { const s = await getSettings(); setSt({ saveHistory: s.saveHistory !== false, improveModel: !!s.improveModel, voice: s.voice || 'Kore', notify: s.notify !== false }); })(); }, []);
-  function update(patch) { setSt(prev => ({ ...prev, ...patch })); saveSettings(patch); }
+  useEffect(() => { (async () => {
+    const local = await getSettings();
+    let merged = local;
+    try {
+      const remote = await api.settings(token);
+      merged = { ...local, ...(remote.settings || {}) };
+      await saveSettings(merged);
+    } catch (_) { /* Offline: the local copy remains available. */ }
+    setSt({ saveHistory: merged.saveHistory !== false, improveModel: !!merged.improveModel, voice: merged.voice || 'Kore', notify: merged.notify !== false });
+  })(); }, [token]);
+  function update(patch) {
+    setSt(prev => ({ ...prev, ...patch }));
+    saveSettings(patch);
+    api.saveSettings(patch, token).catch(() => {});
+  }
   function purge() {
     Alert.alert('Purge all history', 'Permanently delete ALL your chats on this device? This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
@@ -58,8 +71,8 @@ export default function SettingsScreen() {
   }
 
   const Row = ({ icon, label, value, onPress, danger }) => (
-    <Pressable style={styles.row} onPress={onPress} disabled={!onPress}>
-      <Ionicons name={icon} size={19} color={danger ? colors.danger : colors.muted} />
+    <Pressable accessibilityRole={onPress ? "button" : undefined} style={({ pressed }) => [styles.row, onPress && pressed && styles.rowPressed]} onPress={onPress} disabled={!onPress}>
+      <Ionicons name={icon} size={19} color={danger ? colors.danger : colors.primary} />
       <Text style={[styles.rowLabel, danger && { color: colors.danger }]}>{label}</Text>
       {value ? <Text style={styles.rowValue}>{value}</Text> : (onPress ? <Ionicons name="chevron-forward" size={17} color={colors.muted} /> : null)}
     </Pressable>
@@ -88,7 +101,7 @@ export default function SettingsScreen() {
         <Text style={[styles.section, rtlText(rtl)]}>{t('preferences')}</Text>
         <View style={styles.card}>
           <View style={[styles.row, { alignItems: 'flex-start' }]}>
-            <Ionicons name="language" size={19} color={colors.muted} />
+            <Ionicons name="language" size={19} color={colors.primary} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowLabel, rtlText(rtl)]}>{t('language')}</Text>
               <View style={styles.langWrap}>
@@ -102,12 +115,12 @@ export default function SettingsScreen() {
             </View>
           </View>
           <Pressable style={styles.row} onPress={cycle}>
-            <Ionicons name={mode === 'system' ? 'phone-portrait-outline' : (resolved === 'light' ? 'sunny' : 'moon')} size={19} color={colors.muted} />
+            <Ionicons name={mode === 'system' ? 'phone-portrait-outline' : (resolved === 'light' ? 'sunny' : 'moon')} size={19} color={colors.primary} />
             <Text style={[styles.rowLabel, rtlText(rtl)]}>{t('theme')}</Text>
             <Text style={styles.rowValue}>{mode === 'system' ? t('system') : (mode === 'light' ? t('light') : t('dark'))}</Text>
           </Pressable>
           <View style={[styles.row, { alignItems: 'flex-start' }]}>
-            <Ionicons name="mic-outline" size={19} color={colors.muted} />
+            <Ionicons name="mic-outline" size={19} color={colors.primary} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowLabel, rtlText(rtl)]}>{t('voiceSection')}</Text>
               <Text style={[styles.rowSub, rtlText(rtl)]}>{t('voiceForReplies')}</Text>
@@ -123,7 +136,7 @@ export default function SettingsScreen() {
           {/* Alerts folded in here rather than a section of its own — it was one
               lone switch under its own heading. */}
           <View style={styles.row}>
-            <Ionicons name="notifications-outline" size={19} color={colors.muted} />
+            <Ionicons name="notifications-outline" size={19} color={colors.primary} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowLabel, rtlText(rtl)]}>{t('notifTasks')}</Text>
               <Text style={[styles.rowSub, rtlText(rtl)]}>{t('notifTasksSub')}</Text>
@@ -136,12 +149,12 @@ export default function SettingsScreen() {
         <Text style={[styles.section, rtlText(rtl)]}>{t('dataPrivacy')}</Text>
         <View style={styles.card}>
           <View style={styles.row}>
-            <Ionicons name="save-outline" size={19} color={colors.muted} />
+            <Ionicons name="save-outline" size={19} color={colors.primary} />
             <Text style={[styles.rowLabel, rtlText(rtl)]}>{t('saveHistory')}</Text>
             <Switch value={st.saveHistory} onValueChange={v => update({ saveHistory: v })} trackColor={{ true: colors.primary }} />
           </View>
           <View style={styles.row}>
-            <Ionicons name="analytics-outline" size={19} color={colors.muted} />
+            <Ionicons name="analytics-outline" size={19} color={colors.primary} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowLabel, rtlText(rtl)]}>{t('helpImprove')}</Text>
               <Text style={[styles.rowSub, rtlText(rtl)]}>{t('helpImproveSub')}</Text>
@@ -205,12 +218,13 @@ const makeStyles = (colors) => StyleSheet.create({
     borderRadius: radius.lg, paddingHorizontal: 14, marginBottom: 16,
   },
   row: {
-    flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, minHeight: 56,
     borderBottomWidth: 1, borderBottomColor: colors.border,
   },
-  rowLabel: { color: colors.text, fontFamily: fonts.regular, fontSize: 14, flex: 1 },
+  rowPressed: { backgroundColor: colors.cardAlt, marginHorizontal: -8, paddingHorizontal: 8, borderRadius: radius.md },
+  rowLabel: { color: colors.text, fontFamily: fonts.semibold, fontSize: 14, lineHeight: 20, flex: 1 },
   rowValue: { color: colors.muted, fontFamily: fonts.regular, fontSize: 12.5, maxWidth: 170 },
-  rowSub: { color: colors.muted, fontFamily: fonts.regular, fontSize: 11.5, marginTop: 2 },
+  rowSub: { color: colors.muted, fontFamily: fonts.regular, fontSize: 12, lineHeight: 17, marginTop: 2 },
   langWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 9 },
   langPill: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
   langOn: { backgroundColor: colors.primary, borderColor: colors.primary },
@@ -218,7 +232,7 @@ const makeStyles = (colors) => StyleSheet.create({
   langTxt: { color: colors.text, fontFamily: fonts.medium, fontSize: 12 },
   voiceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   voicePill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border },
-  voiceOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  voiceOn: { backgroundColor: colors.primary, borderColor: colors.primary },
   voiceTxt: { color: colors.muted, fontFamily: fonts.medium, fontSize: 13 },
   logout: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
