@@ -24,10 +24,10 @@ import { speakText, stopSpeaking } from '../tts';
 
 const FLAG = { green: '#078930', yellow: '#FCDD09', red: '#DA121A' };
 const PRIMARY_RED = '#B3121B';
-const RESPONSE_LEVELS = [
-  { id: 'quick', label: 'Instant', sub: 'Shortest and fastest reply', icon: 'flash' },
-  { id: 'balanced', label: 'Medium', sub: 'Balanced detail and speed', icon: 'remove' },
-  { id: 'deep', label: 'High', sub: 'Most complete answer', icon: 'sparkles' },
+const RESPONSE_LEVEL_IDS = [
+  { id: 'quick', icon: 'flash' },
+  { id: 'balanced', icon: 'remove' },
+  { id: 'deep', icon: 'sparkles' },
 ];
 
 // Starter prompts shown on the empty chat screen (translated via i18n keys).
@@ -55,6 +55,10 @@ export default function ChatConversationScreen({ navigation, route }) {
   const { openSidebar } = useUI();
   const { lang, t, rtl } = useLang();
   const { notify } = useNotify();
+  const responseLevels = useMemo(() => RESPONSE_LEVEL_IDS.map(level => ({
+    ...level, label: t(level.id === 'quick' ? 'instant' : level.id === 'balanced' ? 'medium' : 'high'),
+    sub: t(level.id === 'quick' ? 'instantSub' : level.id === 'balanced' ? 'mediumSub' : 'highSub'),
+  })), [t]);
   const firstName = ((user?.name || '').trim().split(' ')[0]) || 'there';
   const greetWord = (() => { const h = new Date().getHours(); return h < 12 ? t('morning') : h < 18 ? t('afternoon') : t('evening'); })();
   const scrollRef = useRef(null);
@@ -398,7 +402,7 @@ export default function ChatConversationScreen({ navigation, route }) {
         <FlagMenu onPress={openSidebar} size={22} />
         <Pressable onPress={() => setModeOpen(o => !o)} style={styles.modeSel}>
           <Ionicons name={mode === 'smart' ? 'sparkles' : 'flash'} size={13} color={colors.primary} />
-          <Text style={styles.modeSelTxt}>{mode === 'smart' ? t('smart') : t('fast')} · {RESPONSE_LEVELS.find(x => x.id === effort)?.label || 'Instant'}</Text>
+          <Text style={styles.modeSelTxt}>{mode === 'smart' ? t('smart') : t('fast')} · {responseLevels.find(x => x.id === effort)?.label || t('instant')}</Text>
           <Ionicons name={modeOpen ? 'chevron-up' : 'chevron-down'} size={13} color={colors.muted} />
         </Pressable>
         <Text style={styles.title} numberOfLines={1}>{route.params?.title || (imageMode ? 'Image Generator' : '')}</Text>
@@ -409,7 +413,7 @@ export default function ChatConversationScreen({ navigation, route }) {
 
       {modeOpen && (
         <View style={styles.modeDrop}>
-          <Text style={styles.dropLabel}>Choose model</Text>
+          <Text style={styles.dropLabel}>{t('chooseModel')}</Text>
           <Pressable onPress={() => setMode('fast')} style={[styles.modeDropRow, mode === 'fast' && styles.modeDropOn]}>
             <Ionicons name="flash" size={15} color={colors.primary} />
             <View style={{ flex: 1 }}>
@@ -427,8 +431,8 @@ export default function ChatConversationScreen({ navigation, route }) {
             {mode === 'smart' && <Ionicons name="checkmark" size={16} color={colors.primary} />}
           </Pressable>
           <View style={styles.dropDivider} />
-          <Text style={styles.dropLabel}>Choose reply depth</Text>
-          {RESPONSE_LEVELS.map(level => (
+          <Text style={styles.dropLabel}>{t('replyDepth')}</Text>
+          {responseLevels.map(level => (
             <Pressable key={level.id} onPress={() => setEffort(level.id)} style={[styles.modeDropRow, effort === level.id && styles.modeDropOn]}>
               <Ionicons name={level.icon} size={15} color={colors.primary} />
               <View style={{ flex: 1 }}>
