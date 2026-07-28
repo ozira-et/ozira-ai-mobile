@@ -407,8 +407,8 @@ export default function ChatConversationScreen({ navigation, route }) {
           <Ionicons name={modeOpen ? 'chevron-up' : 'chevron-down'} size={13} color={colors.muted} />
         </Pressable>
         <Text style={styles.title} numberOfLines={1}>{route.params?.title || (imageMode ? 'Image Generator' : '')}</Text>
-        <Pressable onPress={() => setConvMenu(true)} hitSlop={10}>
-          <Ionicons name="ellipsis-vertical" size={20} color={colors.text} />
+        <Pressable onPress={() => setConvMenu(true)} hitSlop={8} style={styles.moreBtn} accessibilityRole="button" accessibilityLabel="Conversation options">
+          <Ionicons name="ellipsis-vertical" size={19} color={colors.primary} />
         </Pressable>
       </View>
 
@@ -622,24 +622,25 @@ export default function ChatConversationScreen({ navigation, route }) {
       <Modal visible={convMenu} transparent animationType="fade" onRequestClose={() => setConvMenu(false)}>
         <Pressable style={styles.convMenuBg} onPress={() => setConvMenu(false)}>
           <View style={[styles.convMenu, { marginTop: insets.top + 44 }]}>
-            <Pressable style={styles.convItem} onPress={shareConversation}>
-              <Ionicons name="share-social-outline" size={18} color={colors.text} />
+            <Text style={styles.convHeader}>Conversation options</Text>
+            <Pressable style={({ pressed }) => [styles.convItem, pressed && styles.convItemPressed]} onPress={shareConversation}>
+              <Ionicons name="share-social-outline" size={18} color={colors.primary} />
               <Text style={styles.convItemTxt}>Share</Text>
             </Pressable>
-            <Pressable style={styles.convItem} onPress={togglePin}>
+            <Pressable style={({ pressed }) => [styles.convItem, pressed && styles.convItemPressed]} onPress={togglePin}>
               <Ionicons name={pinned ? 'pin' : 'pin-outline'} size={18} color={pinned ? colors.gold : colors.text} />
               <Text style={styles.convItemTxt}>{pinned ? 'Unpin' : 'Pin'}</Text>
             </Pressable>
-            <Pressable style={styles.convItem} onPress={addToProject}>
-              <Ionicons name="folder-outline" size={18} color={colors.text} />
+            <Pressable style={({ pressed }) => [styles.convItem, pressed && styles.convItemPressed]} onPress={addToProject}>
+              <Ionicons name="folder-outline" size={18} color={colors.primary} />
               <Text style={styles.convItemTxt}>Add to project</Text>
             </Pressable>
-            <Pressable style={styles.convItem} onPress={archiveConversation}>
-              <Ionicons name="archive-outline" size={18} color={colors.text} />
+            <Pressable style={({ pressed }) => [styles.convItem, pressed && styles.convItemPressed]} onPress={archiveConversation}>
+              <Ionicons name="archive-outline" size={18} color={colors.primary} />
               <Text style={styles.convItemTxt}>Archive</Text>
             </Pressable>
             <View style={styles.convDivider} />
-            <Pressable style={styles.convItem} onPress={deleteThis}>
+            <Pressable style={({ pressed }) => [styles.convItem, pressed && styles.convItemPressed]} onPress={deleteThis}>
               <Ionicons name="trash-outline" size={18} color={colors.danger} />
               <Text style={[styles.convItemTxt, { color: colors.danger }]}>Delete</Text>
             </Pressable>
@@ -733,14 +734,16 @@ const makeStyles = (colors) => StyleSheet.create({
   // These are deliberately separate 36px targets. Previously their hitSlop
   // regions overlapped, causing Copy taps to sometimes invoke Refresh.
   actBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
-  convMenuBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'flex-end', paddingRight: 10 },
+  moreBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.primary + '12', alignItems: 'center', justifyContent: 'center' },
+  convMenuBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.26)', alignItems: 'flex-end', paddingRight: 12 },
   convMenu: {
     backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    borderRadius: 14, paddingVertical: 6, width: 220,
-    shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8,
+    borderRadius: 16, paddingVertical: 7, width: 236,
+    shadowColor: '#000', shadowOpacity: 0.20, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 9,
   },
-  convHeader: { color: colors.muted, fontFamily: fonts.semibold, fontSize: 11.5, textTransform: 'uppercase', letterSpacing: 0.5, paddingHorizontal: 14, paddingVertical: 8 },
-  convItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 11 },
+  convHeader: { color: colors.primary, fontFamily: fonts.semibold, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6, paddingHorizontal: 15, paddingVertical: 9 },
+  convItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 15, paddingVertical: 12, marginHorizontal: 5, borderRadius: 10 },
+  convItemPressed: { backgroundColor: colors.primary + '12' },
   convItemTxt: { color: colors.text, fontFamily: fonts.medium, fontSize: 14.5 },
   convDivider: { height: 1, backgroundColor: colors.border, marginVertical: 4 },
   empty: { marginTop: 18, gap: 18 },
