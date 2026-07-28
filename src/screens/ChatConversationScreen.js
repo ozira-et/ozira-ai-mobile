@@ -711,13 +711,13 @@ const makeStyles = (colors) => StyleSheet.create({
   title: { color: colors.text, fontFamily: fonts.semibold, fontSize: 14, flex: 1, textAlign: 'center', marginHorizontal: 8 },
   modeSel: {
     flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: 8,
-    backgroundColor: colors.primary + '10', borderWidth: 1, borderColor: colors.primary + '38',
+    backgroundColor: colors.primary + '10', borderWidth: 1, borderColor: colors.border,
     borderRadius: 999, paddingHorizontal: 8, paddingVertical: 5,
   },
   modeSelTxt: { color: colors.text, fontFamily: fonts.semibold, fontSize: 12, lineHeight: 16 },
   modeDrop: {
     position: 'absolute', top: 0, left: 12, zIndex: 50, marginTop: 92,
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.primary + '88',
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
     borderRadius: 12, padding: 5, width: 236, overflow: 'hidden',
     shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 8,
   },
