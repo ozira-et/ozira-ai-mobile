@@ -476,7 +476,7 @@ export default function ChatConversationScreen({ navigation, route }) {
             {!m.image && !m.pending && m.content ? (
               <View style={styles.actionRow}>
                 {m.role === 'assistant' && (
-                  <Pressable onPress={() => onSpeak(i, m)} hitSlop={8} style={styles.actBtn}>
+                  <Pressable onPress={() => onSpeak(i, m)} style={styles.actBtn}>
                     {speakBusy === i ? (
                       <ActivityIndicator size="small" color={colors.primary} />
                     ) : (
@@ -484,34 +484,34 @@ export default function ChatConversationScreen({ navigation, route }) {
                     )}
                   </Pressable>
                 )}
-                <Pressable onPress={() => copyMsg(m)} hitSlop={8} style={styles.actBtn}>
+                <Pressable onPress={() => copyMsg(m)} style={styles.actBtn}>
                   <Ionicons name="copy-outline" size={14} color={colors.muted} />
                 </Pressable>
                 {/* Edit your own message and re-run the answer. */}
                 {m.role === 'user' && !m.thumb && (
-                  <Pressable onPress={() => startEdit(i, m)} hitSlop={8} style={styles.actBtn}>
+                  <Pressable onPress={() => startEdit(i, m)} style={styles.actBtn}>
                     <Ionicons name="pencil-outline" size={14} color={editIdx === i ? colors.primary : colors.muted} />
                   </Pressable>
                 )}
                 {m.role === 'assistant' && (
-                  <Pressable onPress={() => regenerate(i)} hitSlop={8} style={styles.actBtn}>
+                  <Pressable onPress={() => regenerate(i)} style={styles.actBtn}>
                     <Ionicons name="refresh-outline" size={14} color={colors.muted} />
                   </Pressable>
                 )}
                 {m.role === 'assistant' && (
                   <>
-                    <Pressable onPress={() => react(i, m, 1)} hitSlop={8} style={styles.actBtn}>
+                    <Pressable onPress={() => react(i, m, 1)} style={styles.actBtn}>
                       <Ionicons name={m.reaction === 1 ? 'thumbs-up' : 'thumbs-up-outline'} size={14} color={m.reaction === 1 ? colors.success : colors.muted} />
                     </Pressable>
-                    <Pressable onPress={() => react(i, m, -1)} hitSlop={8} style={styles.actBtn}>
+                    <Pressable onPress={() => react(i, m, -1)} style={styles.actBtn}>
                       <Ionicons name={m.reaction === -1 ? 'thumbs-down' : 'thumbs-down-outline'} size={14} color={m.reaction === -1 ? colors.danger : colors.muted} />
                     </Pressable>
                   </>
                 )}
-                <Pressable onPress={() => shareMsg(m)} hitSlop={8} style={styles.actBtn}>
+                <Pressable onPress={() => shareMsg(m)} style={styles.actBtn}>
                   <Ionicons name="share-social-outline" size={14} color={colors.muted} />
                 </Pressable>
-                <Pressable onPress={() => webSearch(m)} hitSlop={8} style={styles.actBtn}>
+                <Pressable onPress={() => webSearch(m)} style={styles.actBtn}>
                   <Ionicons name="globe-outline" size={14} color={colors.muted} />
                 </Pressable>
               </View>
@@ -696,8 +696,10 @@ const makeStyles = (colors) => StyleSheet.create({
   modeDropOn: { backgroundColor: colors.card },
   modeDropTitle: { color: colors.text, fontFamily: fonts.semibold, fontSize: 14 },
   modeDropSub: { color: colors.muted, fontFamily: fonts.regular, fontSize: 11.5, marginTop: 1 },
-  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 8 },
-  actBtn: { padding: 5, borderRadius: 8 },
+  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 },
+  // These are deliberately separate 36px targets. Previously their hitSlop
+  // regions overlapped, causing Copy taps to sometimes invoke Refresh.
+  actBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
   convMenuBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'flex-end', paddingRight: 10 },
   convMenu: {
     backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
