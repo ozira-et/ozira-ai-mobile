@@ -145,7 +145,14 @@ export default function VoiceOverlay({ visible, onClose, token, lang = 'en', use
       const d = await api.aiTranscribe(b64, 'audio/m4a', token);
       setTiming(x => ({ ...x, stt: Date.now() - t0 }));
       const text = (d && d.text || '').trim();
-      if (!text) { if (runningRef.current) return listen(); return; }
+      if (!text) {
+        // Show why nothing happened instead of looping in silence: a real error
+        // (STT down, not configured) is different from just not hearing speech.
+        const why = d && (d.error || d.notice);
+        if (why) setCaption('⚠️ ' + why);
+        if (runningRef.current) return listen();
+        return;
+      }
       setCaption('“' + text + '”');
       setStatus('thinking');
       const t1 = Date.now();
