@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Image } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Image, ImageBackground } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -53,14 +53,16 @@ export default function MenuScreen({ navigation }) {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 30 }}>
-        <Pressable style={styles.profile} onPress={() => navigation.navigate('Profile')}>
-          {profile.avatar ? <Image source={{ uri: profile.avatar }} style={styles.avatar} /> : <View style={styles.avatar}><Text style={styles.avatarTxt}>{initial}</Text></View>}
-          <View style={{ flex: 1 }}>
-            <Text style={styles.name} numberOfLines={1}>{user?.name || 'OZIRA user'}</Text>
-            {profile.showZodiac !== false && zodiac ? <Text style={styles.sign}>{zodiac.emoji} {zodiac.name}</Text> : <Text style={styles.email} numberOfLines={1}>{user?.email || ''}</Text>}
-          </View>
-          <Ionicons name="create-outline" size={18} color={colors.muted} />
-        </Pressable>
+        <ImageBackground source={require('../../assets/sidebar-artistic-gradient.png')} style={styles.profile} imageStyle={styles.profileArt}>
+          <Pressable style={styles.profileInner} onPress={() => navigation.navigate('Profile')}>
+            {profile.avatar ? <Image source={{ uri: profile.avatar }} style={styles.avatar} /> : <View style={styles.avatar}><Text style={styles.avatarTxt}>{initial}</Text></View>}
+            <View style={{ flex: 1 }}>
+              <Text style={styles.name} numberOfLines={1}>{user?.name || 'OZIRA user'}</Text>
+              {profile.showZodiac !== false && zodiac ? <Text style={styles.sign}>{zodiac.emoji} {zodiac.name}</Text> : <Text style={styles.email} numberOfLines={1}>{user?.email || ''}</Text>}
+            </View>
+            <Ionicons name="create-outline" size={18} color="rgba(255,255,255,0.82)" />
+          </Pressable>
+        </ImageBackground>
 
         {GROUPS.map(g => (
           <View key={g.title}>
@@ -85,12 +87,14 @@ export default function MenuScreen({ navigation }) {
 const makeStyles = (colors) => StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
   title: { color: colors.text, fontFamily: fonts.semibold, fontSize: 17 },
-  profile: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: 14, marginBottom: 16 },
-  avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  profile: { backgroundColor: '#250914', borderWidth: 1, borderColor: colors.primary + '66', borderRadius: radius.lg, marginBottom: 16, overflow: 'hidden' },
+  profileArt: { opacity: 0.88 },
+  profileInner: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, backgroundColor: 'rgba(26,4,15,0.22)' },
+  avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.94)', alignItems: 'center', justifyContent: 'center' },
   avatarTxt: { color: colors.white, fontFamily: fonts.bold, fontSize: 22 },
-  name: { color: colors.text, fontFamily: fonts.semibold, fontSize: 16 },
-  email: { color: colors.muted, fontFamily: fonts.regular, fontSize: 13, marginTop: 2 },
-  sign: { color: colors.primary, fontFamily: fonts.semibold, fontSize: 13, marginTop: 2 },
+  name: { color: colors.white, fontFamily: fonts.semibold, fontSize: 16 },
+  email: { color: 'rgba(255,255,255,0.78)', fontFamily: fonts.regular, fontSize: 13, marginTop: 2 },
+  sign: { color: '#FFD76A', fontFamily: fonts.semibold, fontSize: 13, marginTop: 2 },
   // Matches the section label in SettingsScreen so both screens group alike.
   group: { color: colors.muted, fontFamily: fonts.semibold, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 14, marginBottom: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: 13, marginBottom: 8 },

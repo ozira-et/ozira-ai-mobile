@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Linking, Alert, Switch } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Linking, Alert, Switch, ImageBackground } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { fonts, radius } from '../theme';
@@ -74,6 +74,15 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 30 }}>
+        <ImageBackground source={require('../../assets/sidebar-artistic-gradient.png')} style={styles.settingsHero} imageStyle={styles.settingsHeroArt}>
+          <View style={styles.settingsHeroInner}>
+            <Ionicons name="settings-outline" size={24} color="#FFD76A" />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.settingsHeroTitle, rtlText(rtl)]}>{t('settings')}</Text>
+              <Text style={[styles.settingsHeroSub, rtlText(rtl)]}>{t('preferences')}</Text>
+            </View>
+          </View>
+        </ImageBackground>
         {/* PREFERENCES — language, theme, voice and alerts: everything that
             controls "how the app behaves for me", in one place. */}
         <Text style={[styles.section, rtlText(rtl)]}>{t('preferences')}</Text>
@@ -185,6 +194,11 @@ const makeStyles = (colors) => StyleSheet.create({
     paddingHorizontal: 16, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border,
   },
   title: { color: colors.text, fontFamily: fonts.semibold, fontSize: 17 },
+  settingsHero: { backgroundColor: '#250914', borderRadius: radius.lg, overflow: 'hidden', marginBottom: 12, borderWidth: 1, borderColor: colors.primary + '66' },
+  settingsHeroArt: { opacity: 0.88 },
+  settingsHeroInner: { flexDirection: 'row', alignItems: 'center', gap: 11, padding: 15, backgroundColor: 'rgba(26,4,15,0.22)' },
+  settingsHeroTitle: { color: colors.white, fontFamily: fonts.semibold, fontSize: 17 },
+  settingsHeroSub: { color: 'rgba(255,255,255,0.78)', fontFamily: fonts.regular, fontSize: 12.5, marginTop: 1 },
   section: { color: colors.muted, fontFamily: fonts.medium, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8, marginTop: 8 },
   card: {
     backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
