@@ -40,12 +40,12 @@ const SUGGESTIONS = [
 ];
 
 const MENU = [
-  { key: 'photo', label: 'Photo', sub: 'Send a picture to the AI', icon: 'image', color: colors.primary },
-  { key: 'camera', label: 'Camera', sub: 'Take a photo now', icon: 'camera', color: colors.accent },
-  { key: 'file', label: 'File', sub: 'PDF, text or document', icon: 'document-text', color: colors.secondary },
-  { key: 'image', label: 'Create image', sub: 'Generate a picture with AI', icon: 'color-palette', color: colors.gold },
-  { key: 'research', label: 'Research', sub: 'Search the web to answer', icon: 'globe', color: colors.success },
-  { key: 'connector', label: 'Connectors', sub: 'Link Telegram, Drive, Gmail…', icon: 'git-network', color: colors.accent },
+  { key: 'photo', label: 'Photo', sub: 'Send a picture to the AI', icon: 'image' },
+  { key: 'camera', label: 'Camera', sub: 'Take a photo now', icon: 'camera' },
+  { key: 'file', label: 'File', sub: 'PDF, text or document', icon: 'document-text' },
+  { key: 'image', label: 'Create image', sub: 'Generate a picture with AI', icon: 'color-palette' },
+  { key: 'research', label: 'Research', sub: 'Search the web to answer', icon: 'globe' },
+  { key: 'connector', label: 'Connectors', sub: 'Link Telegram, Drive, Gmail…', icon: 'git-network' },
 ];
 
 export default function ChatConversationScreen({ navigation, route }) {
@@ -583,7 +583,7 @@ export default function ChatConversationScreen({ navigation, route }) {
         ) : null}
         <View style={[styles.inputRow, rtlRow(rtl)]}>
           <Pressable onPress={() => setMenuOpen(true)} style={styles.round}>
-            <Ionicons name="add" size={24} color={colors.muted} />
+            <Ionicons name="add" size={24} color={colors.primary} />
           </Pressable>
           <TextInput
             style={[styles.input, rtlText(rtl)]}
@@ -674,15 +674,15 @@ export default function ChatConversationScreen({ navigation, route }) {
           <View style={[styles.menuSheet, { paddingBottom: insets.bottom + 12 }]}>
             <View style={styles.menuHandle} />
             {MENU.map(item => (
-              <Pressable key={item.key} style={styles.menuItem} onPress={() => onMenu(item.key)}>
-                <View style={[styles.menuIcon, { backgroundColor: item.color + '22' }]}>
-                  <Ionicons name={item.icon} size={20} color={item.color} />
+              <Pressable key={item.key} style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]} onPress={() => onMenu(item.key)}>
+                <View style={styles.menuIcon}>
+                  <Ionicons name={item.icon} size={20} color={colors.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.menuLabel}>{item.label}</Text>
                   <Text style={styles.menuSub}>{item.sub}</Text>
                 </View>
-                {item.soon ? <Text style={styles.soon}>Soon</Text> : <Ionicons name="chevron-forward" size={16} color={colors.muted} />}
+                {item.soon ? <Text style={styles.soon}>Soon</Text> : <Ionicons name="chevron-forward" size={16} color={colors.primary} />}
               </Pressable>
             ))}
           </View>
@@ -808,17 +808,18 @@ const makeStyles = (colors) => StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end', zIndex: 50,
     ...(Platform.OS === 'android' ? { elevation: 50 } : null),
   },
-  menuSheet: { backgroundColor: colors.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingHorizontal: 12, paddingTop: 10 },
-  menuHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: 10 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11, paddingHorizontal: 6 },
-  menuIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  menuSheet: { backgroundColor: colors.surface, borderTopWidth: 2, borderTopColor: colors.primary, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingHorizontal: 12, paddingTop: 10 },
+  menuHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.primary + '66', alignSelf: 'center', marginBottom: 10 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 9, borderRadius: radius.md },
+  menuItemPressed: { backgroundColor: colors.primary + '12' },
+  menuIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary + '14' },
   menuLabel: { color: colors.text, fontFamily: fonts.semibold, fontSize: 15 },
   menuSub: { color: colors.muted, fontFamily: fonts.regular, fontSize: 12, marginTop: 1 },
   soon: { color: colors.muted, fontFamily: fonts.medium, fontSize: 11, backgroundColor: colors.card, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
   inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
   round: {
-    width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface,
-    borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center',
+    width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary + '12',
+    borderWidth: 1, borderColor: colors.primary + '55', alignItems: 'center', justifyContent: 'center',
   },
   input: {
     flex: 1, minHeight: 44, maxHeight: 120, backgroundColor: colors.surface,
