@@ -1,58 +1,254 @@
-// Branded launch screen: the OZIRA logo animates in a white disc on brand red,
-// shown for ~2s while the app boots. Calls onDone when its exit finishes.
+// Exactly two seconds of OZIRA's African-heritage journey. The five local
+// keyframes share one Africa silhouette, so short cross-fades read as a single
+// continuous material transformation instead of a slideshow.
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
-import { fonts } from '../theme';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
+import { Asset } from 'expo-asset';
+import { LinearGradient } from 'expo-linear-gradient';
 import Logo from './Logo';
 
-const RED = '#B3121B';
-const FLAG = { green: '#078930', yellow: '#FCDD09', red: '#DA121A' };
+const BG = '#0B0B12';
+const PRIMARY = '#E11D48';
+const ACCENT = '#7C3AED';
+
+const FRAMES = [
+  require('../../assets/splash-journey/01-giza.jpg'),
+  require('../../assets/splash-journey/02-djenne.jpg'),
+  require('../../assets/splash-journey/03-lalibela.jpg'),
+  require('../../assets/splash-journey/04-serengeti.jpg'),
+  require('../../assets/splash-journey/05-victoria-falls.jpg'),
+];
+
+const SCENE_WINDOWS = [
+  [0, 200, 380, 460],
+  [360, 440, 600, 680],
+  [580, 660, 820, 900],
+  [800, 880, 1040, 1120],
+  [1020, 1100, 1300, 1510],
+];
+
+// Particles converge around the official vector mark. The final logo is never
+// generated or approximated: it is the same Logo component used by the app.
+const PARTICLES = [
+  [-170, -330, -42, -42, 4], [135, -310, -14, -44, 3],
+  [-115, -245, 14, -44, 5], [185, -210, 42, -42, 3],
+  [-205, -145, -43, -15, 4], [110, -155, -14, -15, 5],
+  [-155, -70, 15, -15, 3], [210, -35, 43, -15, 4],
+  [-185, 35, -43, 14, 5], [150, 65, -14, 14, 3],
+  [-95, 120, 15, 14, 4], [205, 155, 43, 14, 5],
+  [-175, 210, -43, 42, 3], [115, 245, -14, 43, 4],
+  [-65, 310, 15, 43, 5], [180, 330, 43, 42, 3],
+  [-250, -20, -28, -29, 3], [245, 15, 28, -29, 4],
+  [-225, 275, -28, 29, 5], [235, -275, 28, 29, 3],
+  [-45, -360, 0, -29, 4], [40, 365, 0, 29, 5],
+  [-265, -235, -29, 0, 3], [270, 230, 29, 0, 4],
+];
 
 export default function Splash({ onDone }) {
-  const scale = useRef(new Animated.Value(0.6)).current;
-  const opacity = useRef(new Animated.Value(0)).current;
-  const ring = useRef(new Animated.Value(0)).current;
-  const fadeOut = useRef(new Animated.Value(1)).current;
+  const progress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 6, tension: 60 }),
-      Animated.timing(opacity, { toValue: 1, duration: 450, useNativeDriver: true }),
-      Animated.loop(Animated.timing(ring, { toValue: 1, duration: 1400, easing: Easing.linear, useNativeDriver: true })),
-    ]).start();
+    let active = true;
+    let animation;
 
-    const t = setTimeout(() => {
-      Animated.timing(fadeOut, { toValue: 0, duration: 350, useNativeDriver: true })
-        .start(() => onDone && onDone());
-    }, 2000);
-    return () => clearTimeout(t);
-  }, []);
+    // Decode the bundled keyframes first; the measured animation that follows
+    // is always exactly 2000ms, independent of device/storage speed.
+    Asset.loadAsync(FRAMES)
+      .catch(() => undefined)
+      .then(() => {
+        if (!active) return;
+        progress.setValue(0);
+        animation = Animated.timing(progress, {
+          toValue: 2000,
+          duration: 2000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        });
+        animation.start(({ finished }) => {
+          if (finished && active && onDone) onDone();
+        });
+      });
 
-  const spin = ring.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+    return () => {
+      active = false;
+      if (animation) animation.stop();
+    };
+  }, [onDone, progress]);
+
+  const rootOpacity = progress.interpolate({
+    inputRange: [0, 1900, 2000],
+    outputRange: [1, 1, 0],
+    extrapolate: 'clamp',
+  });
+  const journeyScale = progress.interpolate({
+    inputRange: [0, 1300],
+    outputRange: [1.075, 1],
+    extrapolate: 'clamp',
+  });
+  const journeyLift = progress.interpolate({
+    inputRange: [0, 1300],
+    outputRange: [18, -8],
+    extrapolate: 'clamp',
+  });
+  const mistOpacity = progress.interpolate({
+    inputRange: [1200, 1370, 1580],
+    outputRange: [0, 0.58, 0],
+    extrapolate: 'clamp',
+  });
+  const particleOpacity = progress.interpolate({
+    inputRange: [1260, 1380, 1780, 1900],
+    outputRange: [0, 1, 0.85, 0],
+    extrapolate: 'clamp',
+  });
+  const particleScale = progress.interpolate({
+    inputRange: [1300, 1740],
+    outputRange: [1.5, 0.65],
+    extrapolate: 'clamp',
+  });
+  const logoOpacity = progress.interpolate({
+    inputRange: [1520, 1710, 1900],
+    outputRange: [0, 1, 1],
+    extrapolate: 'clamp',
+  });
+  const logoScale = progress.interpolate({
+    inputRange: [1480, 1730],
+    outputRange: [0.68, 1],
+    extrapolate: 'clamp',
+  });
+  const haloScale = progress.interpolate({
+    inputRange: [1450, 1820],
+    outputRange: [0.65, 1.35],
+    extrapolate: 'clamp',
+  });
+  const haloOpacity = progress.interpolate({
+    inputRange: [1450, 1640, 1870],
+    outputRange: [0, 0.45, 0],
+    extrapolate: 'clamp',
+  });
 
   return (
-    <Animated.View style={[styles.root, { opacity: fadeOut }]}>
-      <Animated.View style={{ opacity, transform: [{ scale }], alignItems: 'center' }}>
-        <View style={styles.disc}>
-          <Animated.View style={[styles.ring, { transform: [{ rotate: spin }] }]} />
-          <Logo size={82} />
-        </View>
-        <Text style={styles.brand}>OZIRA AI</Text>
-        <View style={styles.dots}>
-          <View style={[styles.dot, { backgroundColor: FLAG.green }]} />
-          <View style={[styles.dot, { backgroundColor: FLAG.yellow }]} />
-          <View style={[styles.dot, { backgroundColor: FLAG.red }]} />
-        </View>
+    <Animated.View pointerEvents="none" style={[styles.root, { opacity: rootOpacity }]}>
+      <Animated.View
+        style={[
+          StyleSheet.absoluteFillObject,
+          { transform: [{ translateY: journeyLift }, { scale: journeyScale }] },
+        ]}
+      >
+        {FRAMES.map((source, index) => {
+          const [fadeIn, visible, fadeOut, gone] = SCENE_WINDOWS[index];
+          const opacity = progress.interpolate({
+            inputRange: [fadeIn, visible, fadeOut, gone],
+            outputRange: [0, 1, 1, 0],
+            extrapolate: 'clamp',
+          });
+          return (
+            <Animated.Image
+              key={index}
+              source={source}
+              resizeMode="cover"
+              fadeDuration={0}
+              style={[StyleSheet.absoluteFillObject, { opacity }]}
+            />
+          );
+        })}
+      </Animated.View>
+
+      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: mistOpacity }]}>
+        <LinearGradient
+          colors={['rgba(255,255,255,0)', 'rgba(234,226,255,0.88)', 'rgba(225,29,72,0.18)']}
+          locations={[0.18, 0.56, 1]}
+          style={StyleSheet.absoluteFillObject}
+        />
+      </Animated.View>
+
+      <View style={StyleSheet.absoluteFillObject}>
+        {PARTICLES.map(([startX, startY, endX, endY, size], index) => {
+          const translateX = progress.interpolate({
+            inputRange: [1300, 1740],
+            outputRange: [startX, endX],
+            extrapolate: 'clamp',
+          });
+          const translateY = progress.interpolate({
+            inputRange: [1300, 1740],
+            outputRange: [startY, endY],
+            extrapolate: 'clamp',
+          });
+          return (
+            <Animated.View
+              key={index}
+              style={[
+                styles.particle,
+                {
+                  width: size,
+                  height: size,
+                  borderRadius: size,
+                  backgroundColor: index % 2 ? ACCENT : PRIMARY,
+                  opacity: particleOpacity,
+                  transform: [{ translateX }, { translateY }, { scale: particleScale }],
+                },
+              ]}
+            />
+          );
+        })}
+      </View>
+
+      <Animated.View
+        style={[
+          styles.halo,
+          { opacity: haloOpacity, transform: [{ scale: haloScale }] },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.logoDisc,
+          { opacity: logoOpacity, transform: [{ scale: logoScale }] },
+        ]}
+      >
+        <Logo size={86} />
       </Animated.View>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { ...StyleSheet.absoluteFillObject, backgroundColor: RED, alignItems: 'center', justifyContent: 'center', zIndex: 999 },
-  disc: { width: 132, height: 132, borderRadius: 66, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
-  ring: { position: 'absolute', width: 132, height: 132, borderRadius: 66, borderWidth: 3, borderColor: 'rgba(255,255,255,0.55)', borderTopColor: 'transparent', borderRightColor: 'transparent' },
-  brand: { color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 26, letterSpacing: 1, marginTop: 20 },
-  dots: { flexDirection: 'row', gap: 8, marginTop: 14 },
-  dot: { width: 9, height: 9, borderRadius: 5 },
+  root: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 9999,
+    elevation: 9999,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: BG,
+  },
+  particle: {
+    position: 'absolute',
+    left: '50%',
+    top: '50%',
+    shadowColor: '#FFFFFF',
+    shadowOpacity: 0.35,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  halo: {
+    position: 'absolute',
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.65)',
+    backgroundColor: 'rgba(225,29,72,0.12)',
+  },
+  logoDisc: {
+    width: 124,
+    height: 124,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    shadowColor: PRIMARY,
+    shadowOpacity: 0.48,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 14,
+  },
 });
