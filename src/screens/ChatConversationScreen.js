@@ -207,7 +207,16 @@ export default function ChatConversationScreen({ navigation, route }) {
     setConvId(id);
     (async () => {
       const c = await getConversation(id);
-      setMessages(c && c.messages ? c.messages : []);
+      const restored = c && c.messages ? c.messages.map(m => ({
+        ...m,
+        content: typeof m.content === 'string' ? m.content : '',
+        // Web stores server-relative image URLs; React Native needs an absolute
+        // URL to show the saved image in the same conversation.
+        ...(m.image ? { image: absUrl(m.image) } : {}),
+      })) : [];
+      setMessages(restored);
+      // Continue an image thread as an image thread after changing device.
+      setImageMode(!!route.params?.imageMode || restored.some(m => m.image));
       setPinned(!!(c && c.pinned));
       setReactions({});
     })();
@@ -369,6 +378,9 @@ export default function ChatConversationScreen({ navigation, route }) {
     const signal = controller.signal;
     const skill = route.params?.skill || 'general';
     try {
+      // A generated-image thread remains in this flow after reopening it on a
+      // different device. This prevents a follow-up prompt from being sent to
+      // the text model as ordinary chat.
       if (imageMode && !useResearch) {
         const d = await api.image({ prompt: text }, token, signal);
         const img = d.images && d.images[0];
