@@ -43,6 +43,32 @@ async function req(path, { method, body, token, signal } = {}) {
   return data;
 }
 
+async function realtimeSdp(sdp, lang, token, signal) {
+  const sessionDeviceId = await getDeviceId();
+  const res = await fetch(
+    config.API_BASE + '/api/ai/realtime?lang=' + encodeURIComponent(lang || currentLang || 'en'),
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/sdp',
+        'x-ozira-device-id': sessionDeviceId,
+        'x-ozira-device-label': 'OZIRA Mobile · ' + (Platform.OS === 'ios' ? 'iPhone/iPad' : 'Android'),
+        ...((token || authToken) ? { authorization: 'Bearer ' + (token || authToken) } : {}),
+      },
+      body: sdp,
+      signal,
+    },
+  );
+  const raw = await res.text();
+  if (!res.ok) {
+    let message = raw;
+    try { message = JSON.parse(raw).error || message; } catch (_) {}
+    throw new Error(message || ('Realtime connection failed (' + res.status + ')'));
+  }
+  if (!/^v=0/m.test(raw)) throw new Error('Realtime service returned an invalid connection answer.');
+  return raw;
+}
+
 export function absUrl(u) {
   if (!u) return u;
   return /^https?:/.test(u) ? u : config.API_BASE + u;
@@ -85,6 +111,7 @@ export const api = {
   aiResearch: (query, token, signal) => req('/api/ai/research', { body: { query }, token, signal }),
   aiTranscribe: (audio, mimeType, token) => req('/api/ai/transcribe', { body: { audio, mimeType, lang: currentLang }, token }),
   aiSpeak: (text, token, voice) => req('/api/ai/speak', { body: { text, voice, lang: currentLang }, token }),
+  aiRealtime: (sdp, lang, token, signal) => realtimeSdp(sdp, lang, token, signal),
   // --- teams ---
   team: (token) => req('/api/team', { token }),
   teamCreate: (name, token) => req('/api/team/create', { body: { name }, token }),

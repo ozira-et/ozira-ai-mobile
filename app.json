@@ -28,7 +28,8 @@
             "photo"
           ]
         }
-      ]
+      ],
+      "@config-plugins/react-native-webrtc"
     ]
   }
 }

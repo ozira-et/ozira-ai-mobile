@@ -1,283 +1,267 @@
-// Live voice mode — a small rounded "globe" overlay (not full screen). It listens
-// hands-free, sends when you pause (mic metering) or when you tap, speaks the
-// reply, then listens again. Every turn is also written into the chat as text.
-// Auto-closes after a stretch of silence.
+// True realtime voice mode. Microphone audio and model audio travel continuously
+// over one WebRTC connection; no recorded MP4, STT upload, chat call or TTS
+// download is used here. Normal voice messages remain file-based elsewhere.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Modal, Animated, Easing, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Modal, Animated, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { fonts } from '../theme';
 import Logo from './Logo';
-import { api } from '../api';
-import { File } from 'expo-file-system';
-import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
-import { ensurePrepared, releaseRecorder, finalizeRecording } from '../audioSession';
-import { speakText, stopSpeaking } from '../tts';
+import { createRealtimeVoiceSession } from '../realtimeVoice';
 import { t as translate } from '../i18n';
 
 const RED = '#B3121B';
 const ON = '#FFFFFF';
 const DIM = 'rgba(255,255,255,0.8)';
+const HISTORY_TURNS = 8;
 
-// Latency matters more than anything here — a live conversation dies if the reply
-// lags. These are tuned to cut the dead air after you stop talking.
-const SPEAK_DB = -48;        // sensitive enough for a phone held at normal distance
-const SILENCE_MS = 1200;     // allow a natural pause without cutting the sentence
-const POLL_MS = 100;         // how often we check the mic level
-const MIN_TURN_MS = 1800;    // never upload a startup click or a very short noise
-const MAX_TURN_MS = 14000;   // hard cap per turn
-const NO_SPEECH_MS = 9000;   // if nothing said this long, count as idle
-const AUTO_CLOSE_MS = 150000; // ~2.5 min of no real exchange -> close
-const HISTORY_TURNS = 6;     // shorter context = faster model response
-
-// Expo's LOW_QUALITY Android preset records unsupported 3GP/AMR audio. Use the
-// known-good HIGH_QUALITY preset unchanged so each native device records a
-// standards-compliant MPEG-4/AAC clip; Addis mixes stereo down when necessary.
-const SPEECH_RECORDING = {
-  ...RecordingPresets.HIGH_QUALITY,
-  isMeteringEnabled: true,
-};
-
-function recordedMimeType(uri) {
-  return Platform.OS === 'web' || /\.webm(?:$|\?)/i.test(String(uri || ''))
-    ? 'audio/webm'
-    : 'audio/mp4';
-}
-
-function friendlySpeechError(value) {
-  const message = String(value || '').trim();
-  if (/quota|rate.?limit|resource_exhausted|limit:\s*0/i.test(message)) {
-    return 'The backup speech service has no available quota. Please try again.';
+function errorMessage(event) {
+  const value = event?.error?.message || event?.message || 'Realtime voice failed.';
+  const message = String(value).replace(/\s+/g, ' ').trim();
+  if (/quota|rate.?limit|billing|insufficient_quota/i.test(message)) {
+    return 'OpenAI realtime quota is unavailable. Check the OpenAI project billing and limits.';
   }
-  return message.length > 180 ? message.slice(0, 177) + '…' : message;
+  if (/native module|webrtc.*null|not found.*webrtc/i.test(message)) return 'OZIRA_REALTIME_BUILD';
+  return message.length > 220 ? message.slice(0, 217) + '…' : message;
 }
 
-export default function VoiceOverlay({ visible, onClose, token, lang = 'en', userName = '', getHistory, onExchange }) {
+function responseTranscript(event) {
+  const output = event?.response?.output || [];
+  for (const item of output) {
+    for (const part of item?.content || []) {
+      const text = part?.transcript || part?.text;
+      if (text) return String(text).trim();
+    }
+  }
+  return '';
+}
+
+export default function VoiceOverlay({
+  visible,
+  onClose,
+  token,
+  lang = 'en',
+  getHistory,
+  onExchange,
+}) {
   const styles = useMemo(() => makeStyles(), []);
-  const recorder = useAudioRecorder(SPEECH_RECORDING);
-  const [status, setStatus] = useState('idle'); // idle | listening | thinking | speaking
+  const [status, setStatus] = useState('idle');
   const [caption, setCaption] = useState('');
   const [error, setError] = useState('');
-  const [timing, setTiming] = useState({}); // { stt, ai, tts } ms — shows what's slow
+  const [connected, setConnected] = useState(false);
 
-  const convoRef = useRef([]);
-  const pollRef = useRef(null);
-  const turnStartRef = useRef(0);
-  const lastVoiceRef = useRef(0);
-  const hadSpeechRef = useRef(false);
-  const speechFramesRef = useRef(0);
-  const lastExchangeRef = useRef(0);
-  const meteringOkRef = useRef(true);
-  const runningRef = useRef(false);
-  const readyRef = useRef(false);   // mic permission + audio mode done once
-  const sessionRef = useRef(0);     // invalidates async work from an older open/close cycle
-  const preparingRef = useRef(false);
-  const transitionRef = useRef(false);
-  const preparedRef = useRef(false);
-  const releasePromiseRef = useRef(null);
+  const sessionRef = useRef(null);
+  const abortRef = useRef(null);
+  const epochRef = useRef(0);
+  const historyRef = useRef([]);
+  const contextSentRef = useRef(false);
+  const userPartialRef = useRef(new Map());
+  const userTextRef = useRef('');
+  const answerTextRef = useRef('');
+  const exchangeSavedRef = useRef(false);
+  const flushTimerRef = useRef(null);
 
-  // Globe animation
   const pulse = useRef(new Animated.Value(0)).current;
   const ring = useRef(new Animated.Value(0)).current;
-
-  const tr = (k) => translate(lang, k);
-
-  useEffect(() => {
-    if (visible) start(); else stop();
-    return () => stop();
-  }, [visible]);
+  const tr = (key) => translate(lang, key);
 
   useEffect(() => {
-    const loop = Animated.loop(Animated.timing(ring, { toValue: 1, duration: 1800, easing: Easing.out(Easing.ease), useNativeDriver: true }));
-    const p = Animated.loop(Animated.sequence([
+    if (visible) void start();
+    else stop();
+    return stop;
+  }, [visible, lang]);
+
+  useEffect(() => {
+    const ringLoop = Animated.loop(Animated.timing(
+      ring,
+      { toValue: 1, duration: 1800, easing: Easing.out(Easing.ease), useNativeDriver: true },
+    ));
+    const pulseLoop = Animated.loop(Animated.sequence([
       Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true }),
       Animated.timing(pulse, { toValue: 0, duration: 700, useNativeDriver: true }),
     ]));
-    loop.start(); p.start();
-    return () => { loop.stop(); p.stop(); };
+    ringLoop.start();
+    pulseLoop.start();
+    return () => { ringLoop.stop(); pulseLoop.stop(); };
   }, []);
 
-  async function start() {
-    const session = ++sessionRef.current;
-    setError(''); setCaption('');
-    convoRef.current = (getHistory ? getHistory() : []).slice(-HISTORY_TURNS);
-    lastExchangeRef.current = Date.now();
-    runningRef.current = true;
-    // Ask for the mic + configure audio ONCE per session, not once per turn —
-    // doing it every turn added a visible pause between replies.
-    try {
-      const perm = await requestRecordingPermissionsAsync();
-      if (session !== sessionRef.current || !runningRef.current) return;
-      if (!perm.granted) { setError('Microphone permission is needed.'); setStatus('idle'); return; }
-      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-      if (session !== sessionRef.current || !runningRef.current) return;
-      readyRef.current = true;
-    } catch (e) { setError(e.message || 'Mic error'); setStatus('idle'); return; }
-    await listen(session);
+  function resetTurn() {
+    userPartialRef.current.clear();
+    userTextRef.current = '';
+    answerTextRef.current = '';
+    exchangeSavedRef.current = false;
+    clearTimeout(flushTimerRef.current);
+    flushTimerRef.current = null;
   }
 
   function stop() {
-    sessionRef.current += 1;
-    runningRef.current = false;
-    transitionRef.current = false;
-    clearInterval(pollRef.current); pollRef.current = null;
-    void releaseRecorderSession();
-    stopSpeaking();
+    epochRef.current += 1;
+    clearTimeout(flushTimerRef.current);
+    flushTimerRef.current = null;
+    abortRef.current?.abort();
+    abortRef.current = null;
+    sessionRef.current?.close?.();
+    sessionRef.current = null;
+    setConnected(false);
     setStatus('idle');
   }
 
-  async function releaseRecorderSession() {
-    if (releasePromiseRef.current) return releasePromiseRef.current;
-    releasePromiseRef.current = (async () => {
-      await releaseRecorder(recorder);
-      preparedRef.current = false;
-    })();
-    try { await releasePromiseRef.current; }
-    finally { releasePromiseRef.current = null; }
-  }
-
-  async function listen(session = sessionRef.current) {
-    // preparedRef is deliberately NOT a bail-out condition: when it drifted true
-    // the overlay stopped listening entirely and never recovered. Re-entrancy is
-    // covered by preparingRef/transitionRef, and ensurePrepared() handles the
-    // already-prepared case.
-    if (session !== sessionRef.current || !runningRef.current || !readyRef.current
-      || preparingRef.current || transitionRef.current) return;
-    preparingRef.current = true;
-    try {
-      // TTS changes the native audio mode back to playback. Also release any
-      // prepared recorder left behind by a fast refresh or interrupted turn.
-      await releaseRecorderSession();
-      if (session !== sessionRef.current || !runningRef.current) return;
-      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-      if (session !== sessionRef.current || !runningRef.current) return;
-      await ensurePrepared(recorder);
-      preparedRef.current = true;
-      if (session !== sessionRef.current || !runningRef.current) {
-        await releaseRecorderSession();
-        return;
-      }
-      recorder.record();
-    } catch (e) { setError(e.message || 'Mic error'); setStatus('idle'); return; }
-    finally { preparingRef.current = false; }
-
-    setStatus('listening');
-    turnStartRef.current = Date.now();
-    lastVoiceRef.current = Date.now();
-    hadSpeechRef.current = false;
-    speechFramesRef.current = 0;
-
-    clearInterval(pollRef.current);
-    pollRef.current = setInterval(() => {
-      const now = Date.now();
-      let level;
-      try { const st = recorder.getStatus ? recorder.getStatus() : null; level = st && (st.metering != null ? st.metering : undefined); } catch (_) {}
-      if (typeof level === 'number') {
-        if (level > SPEAK_DB) {
-          speechFramesRef.current += 1;
-          hadSpeechRef.current = speechFramesRef.current >= 3;
-          lastVoiceRef.current = now;
-        }
-      } else {
-        meteringOkRef.current = false; // device gives no metering -> rely on caps/tap
-      }
-      // auto-close if nothing meaningful happens for a long time
-      if (now - lastExchangeRef.current > AUTO_CLOSE_MS) { setCaption(''); onClose && onClose(); return; }
-
-      if (meteringOkRef.current) {
-        if (hadSpeechRef.current && now - turnStartRef.current >= MIN_TURN_MS && now - lastVoiceRef.current > SILENCE_MS) return endTurn();
-        if (!hadSpeechRef.current && now - turnStartRef.current > NO_SPEECH_MS) return restartListen();
-      }
-      if (now - turnStartRef.current > MAX_TURN_MS) return endTurn();
-    }, POLL_MS);
-  }
-
-  async function restartListen() {
-    if (transitionRef.current) return;
-    const session = sessionRef.current;
-    transitionRef.current = true;
-    // No speech captured this window — quietly start a fresh listening window.
-    clearInterval(pollRef.current); pollRef.current = null;
-    await releaseRecorderSession();
-    transitionRef.current = false;
-    if (session === sessionRef.current && runningRef.current) await listen(session);
-  }
-
-  async function endTurn() {
-    if (transitionRef.current || !runningRef.current) return;
-    const session = sessionRef.current;
-    transitionRef.current = true;
-    clearInterval(pollRef.current); pollRef.current = null;
-    const resumeListening = async () => {
-      transitionRef.current = false;
-      if (session === sessionRef.current && runningRef.current) await listen(session);
-    };
-    // Clear the previous turn only when new speech is being processed. Doing
-    // this in listen() would erase a useful failure immediately.
+  async function start() {
+    stop();
+    const epoch = ++epochRef.current;
+    const controller = new AbortController();
+    abortRef.current = controller;
+    historyRef.current = (getHistory?.() || []).slice(-HISTORY_TURNS);
+    contextSentRef.current = false;
+    resetTurn();
     setError('');
-    setStatus('hearing');
-    let currentStage = 'Speech recognition';
+    setCaption('');
+    setStatus('connecting');
+
     try {
-      const t0 = Date.now();
-      // Stop AND wait for the encoder to finish writing before reading: an
-      // MPEG-4 read mid-write has audio but no index, and every decoder rejects
-      // it — which surfaced as "no speech detected" on a 221KB upload.
-      const { uri, size } = await finalizeRecording(recorder);
-      preparedRef.current = false;
-      if (session !== sessionRef.current || !runningRef.current) {
-        transitionRef.current = false;
+      const session = await createRealtimeVoiceSession({
+        token,
+        lang,
+        signal: controller.signal,
+        onEvent: (event) => {
+          if (epoch === epochRef.current) handleEvent(event);
+        },
+      });
+      if (epoch !== epochRef.current) {
+        session.close();
         return;
       }
-      if (!uri) return resumeListening();
-      if (!size) { setError('The recording came out empty. Check the microphone permission and try again.'); return resumeListening(); }
-      const b64 = await new File(uri).base64();
-      const d = await api.aiTranscribe(b64, recordedMimeType(uri), token);
-      setTiming(x => ({ ...x, stt: Date.now() - t0 }));
-      const text = (d && d.text || '').trim();
-      if (!text) {
-        // Show why nothing happened instead of looping in silence: a real error
-        // (STT down, not configured) is different from just not hearing speech.
-        const why = d && (d.error || d.notice);
-        if (why) setError('Speech recognition: ' + friendlySpeechError(why));
-        return resumeListening();
+      sessionRef.current = session;
+      if (!contextSentRef.current) {
+        session.sendContext?.(historyRef.current);
+        contextSentRef.current = true;
       }
-      setCaption('“' + text + '”');
-      setStatus('thinking');
-      currentStage = 'AI reply';
-      const t1 = Date.now();
+    } catch (event) {
+      if (epoch !== epochRef.current || controller.signal.aborted) return;
+      setError(errorMessage(event));
+      setStatus('idle');
+    }
+  }
 
-      // Brevity is the single biggest latency lever: the whole reply has to be
-      // synthesised to audio before playback starts, so long answers = long waits.
-      const sys = { role: 'system', content:
-        'You are OZIRA, a warm, friendly voice assistant in a LIVE spoken conversation.'
-        + (userName ? ' The user\'s name is ' + userName + '; greet them by name and speak personally.' : '')
-        + ' Reply in at most 2 short sentences (under 30 words). Be direct and conversational,'
-        + ' like speech — no lists, no markdown, no headings. Only give a longer answer if'
-        + ' explicitly asked for detail.' };
-      const history = [...convoRef.current, { role: 'user', content: text }];
-      const r = await api.chat({ model: 'auto', tier: 'fast', effort: 'quick', skill: 'general', messages: [sys, ...history], lang }, token);
-      const answer = (r && r.reply || '').trim() || '…';
-      setTiming(x => ({ ...x, ai: Date.now() - t1 }));
-      convoRef.current = [...history, { role: 'assistant', content: answer }].slice(-HISTORY_TURNS);
-      lastExchangeRef.current = Date.now();
-      onExchange && onExchange(text, answer);       // write both turns into the chat
-      setCaption(answer);
+  function maybeSaveExchange(wait = true) {
+    if (exchangeSavedRef.current) return;
+    const user = userTextRef.current.trim();
+    const answer = answerTextRef.current.trim();
+    if (user && answer) {
+      exchangeSavedRef.current = true;
+      clearTimeout(flushTimerRef.current);
+      flushTimerRef.current = null;
+      onExchange?.(user, answer);
+      historyRef.current = [...historyRef.current,
+        { role: 'user', content: user },
+        { role: 'assistant', content: answer },
+      ].slice(-HISTORY_TURNS);
+      return;
+    }
+    if (wait && answer && !flushTimerRef.current) {
+      flushTimerRef.current = setTimeout(() => {
+        flushTimerRef.current = null;
+        maybeSaveExchange(false);
+      }, 2500);
+    }
+  }
 
-      if (session !== sessionRef.current || !runningRef.current) {
-        transitionRef.current = false;
-        return;
+  function beginUserTurn() {
+    maybeSaveExchange(false);
+    resetTurn();
+    setError('');
+    setCaption('');
+    setStatus('listening');
+  }
+
+  function handleEvent(event) {
+    switch (event?.type) {
+      case 'ozira.data.open':
+        setConnected(true);
+        setStatus('listening');
+        if (!contextSentRef.current && sessionRef.current) {
+          sessionRef.current.sendContext?.(historyRef.current);
+          contextSentRef.current = true;
+        }
+        break;
+      case 'ozira.connection':
+        if (event.state === 'connected') {
+          setConnected(true);
+          setStatus((value) => value === 'connecting' ? 'listening' : value);
+        } else if (event.state === 'failed' || event.state === 'disconnected') {
+          setConnected(false);
+          setError('OZIRA_REALTIME_INTERRUPTED');
+          setStatus('idle');
+        }
+        break;
+      case 'input_audio_buffer.speech_started':
+        beginUserTurn();
+        break;
+      case 'input_audio_buffer.speech_stopped':
+        setStatus('thinking');
+        break;
+      case 'conversation.item.input_audio_transcription.delta': {
+        const itemId = event.item_id || 'current';
+        const next = (userPartialRef.current.get(itemId) || '') + (event.delta || '');
+        userPartialRef.current.set(itemId, next);
+        if (next.trim()) setCaption('“' + next.trim() + '”');
+        break;
       }
-      setStatus('speaking');
-      currentStage = 'Voice playback';
-      const t2 = Date.now();
-      const spoken = await speakText(answer, token, () => { void resumeListening(); });
-      setTiming(x => ({ ...x, tts: Date.now() - t2 }));
-      if (!spoken?.ok) {
-        setError('Voice playback: ' + (spoken?.message || 'Could not play the spoken reply.'));
-        return resumeListening();
+      case 'conversation.item.input_audio_transcription.completed': {
+        const text = String(event.transcript || '').trim();
+        if (text) {
+          userTextRef.current = text;
+          setCaption('“' + text + '”');
+          maybeSaveExchange();
+        }
+        break;
       }
-    } catch (e) {
-      setError(currentStage + ': ' + friendlySpeechError(e.message || 'Voice error'));
-      return resumeListening();
+      case 'response.created':
+        setStatus('thinking');
+        break;
+      case 'response.output_audio_transcript.delta':
+        answerTextRef.current += event.delta || '';
+        if (answerTextRef.current.trim()) {
+          setCaption(answerTextRef.current.trim());
+          setStatus('speaking');
+        }
+        break;
+      case 'response.output_audio_transcript.done': {
+        const text = String(event.transcript || answerTextRef.current || '').trim();
+        if (text) {
+          answerTextRef.current = text;
+          setCaption(text);
+          setStatus('speaking');
+          maybeSaveExchange();
+        }
+        break;
+      }
+      case 'response.done': {
+        const text = responseTranscript(event) || answerTextRef.current;
+        if (text) {
+          answerTextRef.current = text;
+          setCaption(text);
+          maybeSaveExchange();
+        }
+        if (event?.response?.status === 'failed') {
+          setError(errorMessage(event.response.status_details));
+          setStatus('listening');
+        }
+        break;
+      }
+      case 'output_audio_buffer.stopped':
+        maybeSaveExchange();
+        setStatus('listening');
+        break;
+      case 'response.cancelled':
+        maybeSaveExchange(false);
+        setStatus('listening');
+        break;
+      case 'error':
+        setError(errorMessage(event));
+        setStatus(connected ? 'listening' : 'idle');
+        break;
+      default:
+        break;
     }
   }
 
@@ -294,30 +278,26 @@ export default function VoiceOverlay({ visible, onClose, token, lang = 'en', use
             <Ionicons name="close" size={20} color={ON} />
           </Pressable>
 
-          <Pressable onPress={() => { if (status === 'listening') endTurn(); }} style={styles.globeWrap}>
+          <View style={styles.globeWrap}>
             <Animated.View style={[styles.ring, { transform: [{ scale: ringScale }], opacity: active ? ringOpacity : 0 }]} />
             <Animated.View style={[styles.ring2, { transform: [{ scale: ringScale }], opacity: active ? ringOpacity : 0 }]} />
             <Animated.View style={[styles.globe, { transform: [{ scale: pulseScale }] }]}>
               <Logo size={54} />
             </Animated.View>
-          </Pressable>
+          </View>
 
           <Text style={styles.status}>
-            {status === 'listening' ? tr('vListening')
-              : status === 'hearing' ? 'Hearing you…'
-              : status === 'thinking' ? tr('vThinking')
-              : status === 'speaking' ? tr('vSpeaking') : tr('vIdle')}
+            {status === 'connecting' ? tr('vConnecting')
+              : status === 'listening' ? tr('vListening')
+                : status === 'thinking' ? tr('vThinking')
+                  : status === 'speaking' ? tr('vSpeaking') : tr('vIdle')}
           </Text>
-          {!!caption && <Text style={styles.caption} numberOfLines={3}>{caption}</Text>}
-          {!!error && <Text style={styles.err}>{error}</Text>}
-          {/* Per-step timings so it's obvious which call is the slow one. */}
-          {(timing.stt || timing.ai) ? (
-            <Text style={styles.hint}>
-              {'voice ' + (timing.stt || 0) + 'ms · ai ' + (timing.ai || 0) + 'ms' + (timing.tts ? ' · talk ' + timing.tts + 'ms' : '')}
-            </Text>
-          ) : (
-            <Text style={styles.hint}>{status === 'listening' ? tr('tapToSend') : ''}</Text>
-          )}
+          {!!caption && <Text style={styles.caption} numberOfLines={4}>{caption}</Text>}
+          {!!error && <Text style={styles.err}>
+            {error === 'OZIRA_REALTIME_BUILD' ? tr('vRealtimeBuild')
+              : error === 'OZIRA_REALTIME_INTERRUPTED' ? tr('vRealtimeInterrupted') : error}
+          </Text>}
+          <Text style={styles.hint}>{connected ? 'OZIRA · LIVE' : ''}</Text>
         </View>
       </View>
     </Modal>
