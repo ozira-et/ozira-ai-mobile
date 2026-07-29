@@ -10,6 +10,7 @@ import Logo from './Logo';
 import { api } from '../api';
 import { File } from 'expo-file-system';
 import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
+import { ensurePrepared, releaseRecorder } from '../audioSession';
 import { speakText, stopSpeaking } from '../tts';
 import { t as translate } from '../i18n';
 
@@ -127,7 +128,7 @@ export default function VoiceOverlay({ visible, onClose, token, lang = 'en', use
   async function releaseRecorderSession() {
     if (releasePromiseRef.current) return releasePromiseRef.current;
     releasePromiseRef.current = (async () => {
-      try { await recorder.stop(); } catch (_) {}
+      await releaseRecorder(recorder);
       preparedRef.current = false;
     })();
     try { await releasePromiseRef.current; }
@@ -135,8 +136,12 @@ export default function VoiceOverlay({ visible, onClose, token, lang = 'en', use
   }
 
   async function listen(session = sessionRef.current) {
+    // preparedRef is deliberately NOT a bail-out condition: when it drifted true
+    // the overlay stopped listening entirely and never recovered. Re-entrancy is
+    // covered by preparingRef/transitionRef, and ensurePrepared() handles the
+    // already-prepared case.
     if (session !== sessionRef.current || !runningRef.current || !readyRef.current
-      || preparingRef.current || transitionRef.current || preparedRef.current) return;
+      || preparingRef.current || transitionRef.current) return;
     preparingRef.current = true;
     try {
       // TTS changes the native audio mode back to playback. Also release any
@@ -145,7 +150,7 @@ export default function VoiceOverlay({ visible, onClose, token, lang = 'en', use
       if (session !== sessionRef.current || !runningRef.current) return;
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
       if (session !== sessionRef.current || !runningRef.current) return;
-      await recorder.prepareToRecordAsync();
+      await ensurePrepared(recorder);
       preparedRef.current = true;
       if (session !== sessionRef.current || !runningRef.current) {
         await releaseRecorderSession();

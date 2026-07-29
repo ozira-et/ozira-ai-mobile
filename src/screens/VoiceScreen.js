@@ -11,6 +11,7 @@ import { useLang } from '../context/LanguageContext';
 import { api } from '../api';
 import { File } from 'expo-file-system';
 import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
+import { ensurePrepared, releaseRecorder } from '../audioSession';
 import { speakText, stopSpeaking } from '../tts';
 
 const RED = '#B3121B';
@@ -68,7 +69,7 @@ export default function VoiceScreen({ navigation }) {
       const perm = await requestRecordingPermissionsAsync();
       if (!perm.granted) { setError('Microphone permission is needed for voice chat.'); return; }
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-      await recorder.prepareToRecordAsync();
+      await ensurePrepared(recorder);
       recorder.record();
       setUserText(''); setAiText('');
       setStatus('listening'); startBars();
@@ -78,7 +79,7 @@ export default function VoiceScreen({ navigation }) {
   async function stopAndProcess() {
     setStatus('thinking'); stopBars();
     try {
-      await recorder.stop();
+      await releaseRecorder(recorder);
       const uri = recorder.uri;
       if (!uri) throw new Error('No audio was captured. Try again.');
       const b64 = await new File(uri).base64();
