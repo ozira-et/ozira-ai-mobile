@@ -66,6 +66,7 @@ export const api = {
   createFolder: (name, token) => req('/api/folders/create', { body: { name }, token }),
   deleteFolder: (id, token) => req('/api/folders/delete', { body: { id }, token }),
   images: (token) => req('/api/images', { token }),
+  deleteImage: (payload, token) => req('/api/images/delete', { body: payload, token }),
   feedback: (value, model, text, token) => req('/api/feedback', { body: { value, model, text }, token }),
   subscribe: (planId, provider, token) => req('/api/subscribe', { body: { planId, provider }, token }),
   travelListings: (params, token) => {

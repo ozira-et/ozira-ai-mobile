@@ -101,6 +101,7 @@ export default function ChatConversationScreen({ navigation, route }) {
   const firstName = ((user?.name || '').trim().split(' ')[0]) || 'there';
   const greetWord = (() => { const h = new Date().getHours(); return h < 12 ? t('morning') : h < 18 ? t('afternoon') : t('evening'); })();
   const scrollRef = useRef(null);
+  const inputRef = useRef(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [imageMode, setImageMode] = useState(!!route.params?.imageMode);
@@ -127,13 +128,32 @@ export default function ChatConversationScreen({ navigation, route }) {
   const [speakingIdx, setSpeakingIdx] = useState(null);// index currently playing
   const [voiceOpen, setVoiceOpen] = useState(false);   // live voice overlay
   const [editIdx, setEditIdx] = useState(null);         // index of message being edited
-  const [viewerImage, setViewerImage] = useState(null); // full-screen generated image
+  const [viewerImage, setViewerImage] = useState(null); // { url, id, prompt, index }
+  const [editSource, setEditSource] = useState(null);   // image selected for the next AI edit
+  const [resizeImage, setResizeImage] = useState(null);
   const [savingImage, setSavingImage] = useState(false);
   const [imageSaved, setImageSaved] = useState(false);
 
   useEffect(() => { getProfile().then(p => { instrRef.current = p.customInstructions || ''; }).catch(() => {}); }, []);
   useEffect(() => () => stopSpeaking(), []);
   useEffect(() => { setImageSaved(false); }, [viewerImage]);
+  useEffect(() => {
+    const sourceImage = route.params?.sourceImage;
+    if (!sourceImage) return;
+    setEditSource({
+      url: absUrl(sourceImage),
+      id: route.params?.sourceImageId || null,
+      operation: route.params?.imageOperation || '',
+      size: route.params?.imageSize || '',
+    });
+    setImageMode(true);
+    setInput(route.params?.editPrompt || '');
+    setTimeout(() => inputRef.current?.focus(), 120);
+    navigation.setParams({
+      sourceImage: undefined, sourceImageId: undefined,
+      imageOperation: undefined, imageSize: undefined, editPrompt: undefined,
+    });
+  }, [route.params?.sourceImage]);
   useEffect(() => {
     const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
@@ -326,6 +346,34 @@ export default function ChatConversationScreen({ navigation, route }) {
     if (!uri) return;
     try { await Share.share({ message: uri, url: uri, title: 'OZIRA AI image' }); } catch (_) {}
   }
+  function beginImageEdit(image, prompt = '', options = {}) {
+    if (!image?.url) return;
+    setViewerImage(null);
+    setResizeImage(null);
+    setEditSource({ url: image.url, id: image.id || null, ...options });
+    setImageMode(true);
+    setInput(prompt);
+    setTimeout(() => inputRef.current?.focus(), 120);
+  }
+  function removeGeneratedImage(image, index) {
+    if (!image?.url) return;
+    Alert.alert(t('removeImage'), t('removeImageConfirm'), [
+      { text: t('cancel'), style: 'cancel' },
+      {
+        text: t('remove'), style: 'destructive', onPress: async () => {
+          try {
+            await api.deleteImage({ id: image.id || undefined, url: image.url }, token);
+            setViewerImage(null);
+            dirtyRef.current = true;
+            if (index != null) setMessages(prev => prev.filter((_, i) => i !== index));
+            notify(t('imageRemoved'), '', 'success');
+          } catch (e) {
+            Alert.alert(t('removeImage'), e.message || t('notifFailed'));
+          }
+        },
+      },
+    ]);
+  }
   async function saveGeneratedImage(uri) {
     if (!uri || savingImage) return;
     setSavingImage(true);
@@ -422,7 +470,7 @@ export default function ChatConversationScreen({ navigation, route }) {
     saveConversation({
       id: convId,
       title,
-      messages: messages.map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content : '', image: m.image || null, thumb: m.thumb || null, model: m.model || null, reaction: m.reaction || 0 })),
+      messages: messages.map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content : '', image: m.image || null, imageId: m.imageId || null, thumb: m.thumb || null, model: m.model || null, reaction: m.reaction || 0 })),
     });
   }, [messages]);
 
@@ -463,12 +511,19 @@ export default function ChatConversationScreen({ navigation, route }) {
         : imageFromDataUrl([...next].reverse().find(m => m.role === 'user' && m.thumb)?.thumb);
       if (wantImage) {
         if (!imageMode) setImageMode(true);
-        const source = [...next].reverse().find(m => m.role === 'assistant' && m.image);
+        const previous = [...next].reverse().find(m => m.role === 'assistant' && m.image);
+        const source = editSource || (previous ? { url: previous.image, id: previous.imageId } : null);
         const d = source
-          ? await api.imageEdit({ prompt: text, sourceUrl: source.image }, token, signal)
+          ? await api.imageEdit({
+              prompt: text,
+              sourceUrl: source.url,
+              operation: source.operation || undefined,
+              size: source.size || undefined,
+            }, token, signal)
           : await api.image({ prompt: text }, token, signal);
         const img = d.images && d.images[0];
-        setMessages([...next, img ? { role: 'assistant', image: absUrl(img.url) } : { role: 'assistant', content: d.notice || 'No image returned.' }]);
+        setEditSource(null);
+        setMessages([...next, img ? { role: 'assistant', image: absUrl(img.url), imageId: img.id || null } : { role: 'assistant', content: d.notice || 'No image returned.' }]);
         // Image generation is slow — tell the user it landed.
         if (img) notify(t('notifImageReady'), t('notifImageReadySub'), 'success');
         else notify(t('notifFailed'), d.notice || '', 'warn');
@@ -604,7 +659,7 @@ export default function ChatConversationScreen({ navigation, route }) {
             {m.role === 'assistant' && !m.pending && <Text style={styles.who}>{m.image ? 'Image' : 'OZIRA'}</Text>}
             {m.thumb ? <Image source={{ uri: m.thumb }} style={styles.thumb} /> : null}
             {m.image ? (
-              <Pressable onPress={() => setViewerImage(m.image)} accessibilityRole="button" accessibilityLabel="Open generated image">
+              <Pressable onPress={() => setViewerImage({ url: m.image, id: m.imageId, prompt: m.content, index: i })} accessibilityRole="button" accessibilityLabel="Open generated image">
                 <Image source={{ uri: m.image }} style={styles.image} resizeMode="cover" />
               </Pressable>
             ) : m.pending ? (
@@ -654,12 +709,16 @@ export default function ChatConversationScreen({ navigation, route }) {
                     </Pressable>
                   </>
                 )}
-                <Pressable onPress={() => shareMsg(m)} style={styles.actBtn}>
-                  <Ionicons name="share-social-outline" size={14} color={colors.muted} />
-                </Pressable>
-                <Pressable onPress={() => webSearch(m)} style={styles.actBtn}>
-                  <Ionicons name="globe-outline" size={14} color={colors.muted} />
-                </Pressable>
+                {m.role === 'assistant' && (
+                  <>
+                    <Pressable onPress={() => shareMsg(m)} style={styles.actBtn}>
+                      <Ionicons name="share-social-outline" size={14} color={colors.muted} />
+                    </Pressable>
+                    <Pressable onPress={() => webSearch(m)} style={styles.actBtn}>
+                      <Ionicons name="globe-outline" size={14} color={colors.muted} />
+                    </Pressable>
+                  </>
+                )}
               </View>
             ) : null}
           </View>
@@ -706,6 +765,7 @@ export default function ChatConversationScreen({ navigation, route }) {
             <Ionicons name="add" size={24} color={colors.primary} />
           </Pressable>
           <TextInput
+            ref={inputRef}
             style={[styles.input, rtlText(rtl)]}
             value={input}
             onChangeText={setInput}
@@ -794,12 +854,12 @@ export default function ChatConversationScreen({ navigation, route }) {
             </Pressable>
             <Text style={styles.imageViewerTitle}>{t('notifImageReady')}</Text>
             <View style={styles.viewerTopActions}>
-              <Pressable style={styles.viewerIconBtn} onPress={() => shareGeneratedImage(viewerImage)} accessibilityRole="button" accessibilityLabel="Share image">
+              <Pressable style={styles.viewerIconBtn} onPress={() => shareGeneratedImage(viewerImage?.url)} accessibilityRole="button" accessibilityLabel="Share image">
                 <Ionicons name="share-outline" size={22} color="#FFFFFF" />
               </Pressable>
               <Pressable
                 style={[styles.viewerSaveBtn, imageSaved && styles.viewerSaveBtnDone]}
-                onPress={() => saveGeneratedImage(viewerImage)}
+                onPress={() => saveGeneratedImage(viewerImage?.url)}
                 disabled={savingImage}
                 accessibilityRole="button"
                 accessibilityLabel={imageSaved ? t('notifSaved') : t('saveImage')}
@@ -811,16 +871,43 @@ export default function ChatConversationScreen({ navigation, route }) {
               </Pressable>
             </View>
           </View>
-          <Pressable style={styles.imageViewerBody} onPress={() => setViewerImage(null)}>
-            {!!viewerImage && <Image source={{ uri: viewerImage }} style={styles.imageViewerImage} resizeMode="contain" />}
+          <View style={styles.imageViewerBody}>
+            {!!viewerImage?.url && <Image source={{ uri: viewerImage.url }} style={styles.imageViewerImage} resizeMode="contain" />}
             {imageSaved && (
               <View pointerEvents="none" style={styles.viewerSavedBadge}>
                 <Ionicons name="checkmark-circle" size={22} color="#FFFFFF" />
                 <Text style={styles.viewerSavedBadgeTxt}>{t('savedToPhotos')}</Text>
               </View>
             )}
-          </Pressable>
+            <View style={[styles.viewerTools, { bottom: Math.max(insets.bottom + 28, 62) }]}>
+              <Pressable style={styles.viewerTool} onPress={() => beginImageEdit(viewerImage, t('editImagePrompt'))}><Ionicons name="pencil-outline" size={14} color="#FFFFFF" /><Text style={styles.viewerToolTxt}>{t('editImage')}</Text></Pressable>
+              <Pressable style={styles.viewerTool} onPress={() => beginImageEdit(viewerImage)}><Ionicons name="chatbubble-ellipses-outline" size={14} color="#FFFFFF" /><Text style={styles.viewerToolTxt}>{t('commentImage')}</Text></Pressable>
+              <Pressable style={styles.viewerTool} onPress={() => { setResizeImage(viewerImage); setViewerImage(null); }}><Ionicons name="resize-outline" size={14} color="#FFFFFF" /><Text style={styles.viewerToolTxt}>{t('resizeImage')}</Text></Pressable>
+              <Pressable style={styles.viewerTool} onPress={() => beginImageEdit(viewerImage, t('removeBackgroundPrompt'), { operation: 'remove_background' })}><Ionicons name="cut-outline" size={14} color="#FFFFFF" /><Text style={styles.viewerToolTxt}>{t('removeBackground')}</Text></Pressable>
+              <Pressable style={styles.viewerTool} onPress={() => removeGeneratedImage(viewerImage, viewerImage?.index)}><Ionicons name="trash-outline" size={14} color="#FF8B91" /><Text style={[styles.viewerToolTxt, { color: '#FFB0B4' }]}>{t('remove')}</Text></Pressable>
+            </View>
+          </View>
         </View>
+      </Modal>
+
+      <Modal visible={!!resizeImage} transparent animationType="fade" onRequestClose={() => setResizeImage(null)}>
+        <Pressable style={styles.resizeBackdrop} onPress={() => setResizeImage(null)}>
+          <View style={styles.resizeCard}>
+            <Text style={styles.resizeTitle}>{t('chooseFrame')}</Text>
+            <View style={styles.resizeChoices}>
+              {[
+                { size: '1024x1024', key: 'square', style: { width: 62, height: 62 } },
+                { size: '1024x1536', key: 'portrait', style: { width: 46, height: 68 } },
+                { size: '1536x1024', key: 'landscape', style: { width: 76, height: 50 } },
+              ].map(frame => (
+                <Pressable key={frame.size} style={styles.resizeChoice} onPress={() => beginImageEdit(resizeImage, t('resizePrompt'), { size: frame.size })}>
+                  <View style={[styles.framePreview, frame.style]} />
+                  <Text style={styles.resizeChoiceTxt}>{t(frame.key)}</Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        </Pressable>
       </Modal>
 
       {/* Attachment sheet — a plain in-tree overlay, NOT a <Modal>. This screen
@@ -964,6 +1051,21 @@ const makeStyles = (colors) => StyleSheet.create({
   viewerSaveTxt: { color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 13 },
   imageViewerBody: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 10 },
   imageViewerImage: { width: '100%', height: '100%' },
+  viewerTools: {
+    position: 'absolute', left: 10, right: 10,
+    minHeight: 42, paddingHorizontal: 5, paddingVertical: 4,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around',
+    borderRadius: 18, backgroundColor: 'rgba(10,10,14,0.78)',
+  },
+  viewerTool: { minWidth: 43, maxWidth: 58, height: 33, paddingHorizontal: 3, borderRadius: 9, alignItems: 'center', justifyContent: 'center', gap: 0 },
+  viewerToolTxt: { color: '#FFFFFF', fontFamily: fonts.medium, fontSize: 7.5, textAlign: 'center' },
+  resizeBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
+  resizeCard: { backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 34 },
+  resizeTitle: { color: colors.text, fontFamily: fonts.bold, fontSize: 17, marginBottom: 18 },
+  resizeChoices: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end' },
+  resizeChoice: { width: 94, minHeight: 110, borderRadius: 16, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', gap: 9 },
+  framePreview: { borderWidth: 2, borderColor: colors.primary, borderRadius: 8, backgroundColor: colors.primary + '12' },
+  resizeChoiceTxt: { color: colors.text, fontFamily: fonts.semibold, fontSize: 12 },
   viewerSavedBadge: {
     position: 'absolute', bottom: 28, alignSelf: 'center',
     flexDirection: 'row', alignItems: 'center', gap: 8,

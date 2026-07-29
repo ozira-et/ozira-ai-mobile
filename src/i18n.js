@@ -350,9 +350,90 @@ const T = {
   },
 };
 
+// Image-workspace labels live together so every newly added control stays
+// complete across all eight supported languages.
+const IMAGE_TOOL_T = {
+  en: {
+    editImage: 'Edit', commentImage: 'Comment', resizeImage: 'Resize',
+    removeBackground: 'Remove background', remove: 'Remove', cancel: 'Cancel',
+    removeImage: 'Remove image', removeImageConfirm: 'Permanently remove this image from your library?',
+    imageRemoved: 'Image removed', chooseFrame: 'Choose a frame', square: 'Square',
+    portrait: 'Portrait', landscape: 'Landscape',
+    editImagePrompt: 'Edit this image: ', resizePrompt: 'Resize and recompose this image without changing its main subject.',
+    removeBackgroundPrompt: 'Remove the existing background, isolate the main subject cleanly, and place it on a plain white background. Preserve the subject exactly.',
+  },
+  am: {
+    editImage: 'አርትዕ', commentImage: 'አስተያየት', resizeImage: 'መጠን ቀይር',
+    removeBackground: 'ዳራ አስወግድ', remove: 'አስወግድ', cancel: 'ሰርዝ',
+    removeImage: 'ምስል አስወግድ', removeImageConfirm: 'ይህን ምስል ከቤተ-መጽሐፍትዎ እስከመጨረሻው ያስወግዱ?',
+    imageRemoved: 'ምስሉ ተወግዷል', chooseFrame: 'ፍሬም ይምረጡ', square: 'ካሬ',
+    portrait: 'ቁመት', landscape: 'ወርድ',
+    editImagePrompt: 'ይህን ምስል አርትዕ፦ ', resizePrompt: 'ዋናውን ነገር ሳትቀይር ምስሉን መጠንና አቀማመጥ ቀይር።',
+    removeBackgroundPrompt: 'ያለውን ዳራ አስወግድ፣ ዋናውን ነገር በንጽህና ለይ እና በነጭ ዳራ ላይ አስቀምጥ። ዋናውን ነገር አትቀይር።',
+  },
+  om: {
+    editImage: 'Gulaali', commentImage: 'Yaada', resizeImage: 'Hammamtaa jijjiiri',
+    removeBackground: 'Duubbee haqi', remove: 'Haqi', cancel: 'Dhiisi',
+    removeImage: 'Fakkii haqi', removeImageConfirm: 'Fakkii kana mana kuusaa kee keessaa guutumaan guutuutti haqtaa?',
+    imageRemoved: 'Fakkiin haqame', chooseFrame: 'Bocquu fili', square: 'Iskuweerii',
+    portrait: 'Dhaabbataa', landscape: 'Ciisaa',
+    editImagePrompt: 'Fakkii kana gulaali: ', resizePrompt: 'Mata-duree isaa osoo hin jijjiirin fakkii kana hammamtaa fi qindaaʼina jijjiiri.',
+    removeBackgroundPrompt: 'Duubbee jiru haqi, mata-duree isaa qulqullinaan adda baasiitii duubbee adii salphaa irra kaaʼi. Mata-duree hin jijjiirin.',
+  },
+  ti: {
+    editImage: 'ኣርም', commentImage: 'ርእይቶ', resizeImage: 'ዓቐን ቀይር',
+    removeBackground: 'ድሕረ-ባይታ ኣወግድ', remove: 'ኣወግድ', cancel: 'ሰርዝ',
+    removeImage: 'ስእሊ ኣወግድ', removeImageConfirm: 'ነዚ ስእሊ ካብ ቤተ-መጻሕፍትኻ ንሓዋሩ ከተወግዶ ዲኻ?',
+    imageRemoved: 'ስእሊ ተወጊዱ', chooseFrame: 'ፍሬም ምረጽ', square: 'ትርብዒት',
+    portrait: 'ቁመት', landscape: 'ጎድኒ',
+    editImagePrompt: 'ነዚ ስእሊ ኣርም፦ ', resizePrompt: 'ቀንዲ ነገሩ ከይቀየርካ ዓቐንን ኣቀማምጣን ቀይር።',
+    removeBackgroundPrompt: 'ዘሎ ድሕረ-ባይታ ኣወግድ፣ ቀንዲ ነገር ብጽሩይ ፍለን ኣብ ጻዕዳ ድሕረ-ባይታ ኣቐምጦን። ቀንዲ ነገር ኣይትቐይር።',
+  },
+  ar: {
+    editImage: 'تعديل', commentImage: 'تعليق', resizeImage: 'تغيير الحجم',
+    removeBackground: 'إزالة الخلفية', remove: 'إزالة', cancel: 'إلغاء',
+    removeImage: 'إزالة الصورة', removeImageConfirm: 'هل تريد إزالة هذه الصورة نهائيًا من مكتبتك؟',
+    imageRemoved: 'تمت إزالة الصورة', chooseFrame: 'اختر الإطار', square: 'مربع',
+    portrait: 'عمودي', landscape: 'أفقي',
+    editImagePrompt: 'عدّل هذه الصورة: ', resizePrompt: 'غيّر حجم وتكوين هذه الصورة دون تغيير موضوعها الرئيسي.',
+    removeBackgroundPrompt: 'أزل الخلفية الحالية واعزل الموضوع الرئيسي بدقة وضعه على خلفية بيضاء بسيطة. حافظ على الموضوع كما هو.',
+  },
+  sw: {
+    editImage: 'Hariri', commentImage: 'Maoni', resizeImage: 'Badili ukubwa',
+    removeBackground: 'Ondoa mandharinyuma', remove: 'Ondoa', cancel: 'Ghairi',
+    removeImage: 'Ondoa picha', removeImageConfirm: 'Uondoe picha hii kabisa kwenye maktaba yako?',
+    imageRemoved: 'Picha imeondolewa', chooseFrame: 'Chagua fremu', square: 'Mraba',
+    portrait: 'Wima', landscape: 'Mlalo',
+    editImagePrompt: 'Hariri picha hii: ', resizePrompt: 'Badili ukubwa na mpangilio wa picha bila kubadilisha kitu chake kikuu.',
+    removeBackgroundPrompt: 'Ondoa mandharinyuma yaliyopo, tenga kitu kikuu kwa usafi na ukiweke kwenye mandharinyuma meupe. Usibadilishe kitu kikuu.',
+  },
+  fr: {
+    editImage: 'Modifier', commentImage: 'Commenter', resizeImage: 'Redimensionner',
+    removeBackground: 'Supprimer le fond', remove: 'Supprimer', cancel: 'Annuler',
+    removeImage: 'Supprimer l’image', removeImageConfirm: 'Supprimer définitivement cette image de votre bibliothèque ?',
+    imageRemoved: 'Image supprimée', chooseFrame: 'Choisir un cadre', square: 'Carré',
+    portrait: 'Portrait', landscape: 'Paysage',
+    editImagePrompt: 'Modifier cette image : ', resizePrompt: 'Redimensionne et recadre cette image sans modifier son sujet principal.',
+    removeBackgroundPrompt: 'Supprime le fond existant, isole proprement le sujet principal et place-le sur un fond blanc uni. Préserve exactement le sujet.',
+  },
+  ha: {
+    editImage: 'Gyara', commentImage: 'Sharhi', resizeImage: 'Canja girma',
+    removeBackground: 'Cire bango', remove: 'Cire', cancel: 'Soke',
+    removeImage: 'Cire hoto', removeImageConfirm: 'A cire wannan hoton har abada daga ma’ajiyarka?',
+    imageRemoved: 'An cire hoton', chooseFrame: 'Zaɓi firam', square: 'Murabba’i',
+    portrait: 'Tsaye', landscape: 'Kwance',
+    editImagePrompt: 'Gyara wannan hoton: ', resizePrompt: 'Canja girma da tsarin hoton ba tare da canja babban abin cikinsa ba.',
+    removeBackgroundPrompt: 'Cire bangon da yake akwai, ware babban abin hoton sosai sannan ka sa shi a kan farin bango. Kada ka canja babban abin hoton.',
+  },
+};
+
 export function t(lang, key, vars) {
   const dict = T[lang] || T.en;
-  let s = (dict[key] != null ? dict[key] : (T.en[key] != null ? T.en[key] : key));
+  const imageDict = IMAGE_TOOL_T[lang] || IMAGE_TOOL_T.en;
+  let s = (dict[key] != null ? dict[key]
+    : (imageDict[key] != null ? imageDict[key]
+      : (T.en[key] != null ? T.en[key]
+        : (IMAGE_TOOL_T.en[key] != null ? IMAGE_TOOL_T.en[key] : key))));
   if (vars) for (const k in vars) s = s.replace('{' + k + '}', vars[k]);
   return s;
 }
