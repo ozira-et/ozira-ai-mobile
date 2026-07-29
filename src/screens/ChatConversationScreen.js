@@ -66,6 +66,16 @@ const MENU = [
   { key: 'connector', label: 'Connectors', sub: 'Link Telegram, Drive, Gmail…', icon: 'git-network' },
 ];
 
+// Users should not have to know they must first enable image mode. Recognize a
+// natural image request, then keep that thread in image mode for follow-ups.
+function isImageRequest(value) {
+  const text = String(value || '').trim();
+  if (!text) return false;
+  const visual = /\b(image|picture|photo|photograph|logo|drawing|artwork|illustration|poster|wallpaper|portrait|icon|banner|flag|sticker|meme)\b|(?:ምስል|ስዕል|ፎቶ|ሥዕል)/i;
+  const intent = /\b(generate|create|make|design|produce|draw|paint|sketch|illustrate|render|show|give|want|need)\b|(?:ፍጠር|ስራ|አውጣ|ሳል|ንደፍ)/i;
+  return visual.test(text) && intent.test(text);
+}
+
 export default function ChatConversationScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const colors = useColors();
@@ -381,7 +391,9 @@ export default function ChatConversationScreen({ navigation, route }) {
       // A generated-image thread remains in this flow after reopening it on a
       // different device. This prevents a follow-up prompt from being sent to
       // the text model as ordinary chat.
-      if (imageMode && !useResearch) {
+      const wantImage = (imageMode || isImageRequest(text)) && !useResearch;
+      if (wantImage) {
+        if (!imageMode) setImageMode(true);
         const source = [...next].reverse().find(m => m.role === 'assistant' && m.image);
         const d = source
           ? await api.imageEdit({ prompt: text, sourceUrl: source.image }, token, signal)
