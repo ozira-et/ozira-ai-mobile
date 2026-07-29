@@ -56,6 +56,7 @@ export const api = {
   plans: () => req('/api/plans'),
   chat: (payload, token, signal) => req('/api/chat', { body: payload, token, signal }),
   image: (payload, token, signal) => req('/api/image', { body: payload, token, signal }),
+  imageEdit: (payload, token, signal) => req('/api/image/edit', { body: payload, token, signal }),
   conversations: (folderId, token) => req('/api/conversations' + (folderId ? '?folder=' + encodeURIComponent(folderId) : ''), { token }),
   getConversation: (id, token) => req('/api/conversations/get', { body: { id }, token }),
   saveConversation: (conv, token) => req('/api/conversations/save', { body: conv, token }),

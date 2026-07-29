@@ -382,7 +382,10 @@ export default function ChatConversationScreen({ navigation, route }) {
       // different device. This prevents a follow-up prompt from being sent to
       // the text model as ordinary chat.
       if (imageMode && !useResearch) {
-        const d = await api.image({ prompt: text }, token, signal);
+        const source = [...next].reverse().find(m => m.role === 'assistant' && m.image);
+        const d = source
+          ? await api.imageEdit({ prompt: text, sourceUrl: source.image }, token, signal)
+          : await api.image({ prompt: text }, token, signal);
         const img = d.images && d.images[0];
         setMessages([...next, img ? { role: 'assistant', image: absUrl(img.url) } : { role: 'assistant', content: d.notice || 'No image returned.' }]);
         // Image generation is slow — tell the user it landed.
