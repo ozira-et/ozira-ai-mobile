@@ -19,33 +19,21 @@ const DIM = 'rgba(255,255,255,0.8)';
 
 // Latency matters more than anything here — a live conversation dies if the reply
 // lags. These are tuned to cut the dead air after you stop talking.
-const SPEAK_DB = -35;        // louder than this = speaking
-const SILENCE_MS = 800;      // pause this long after speech = end of turn
+const SPEAK_DB = -48;        // sensitive enough for a phone held at normal distance
+const SILENCE_MS = 1200;     // allow a natural pause without cutting the sentence
 const POLL_MS = 100;         // how often we check the mic level
+const MIN_TURN_MS = 1800;    // never upload a startup click or a very short noise
 const MAX_TURN_MS = 14000;   // hard cap per turn
 const NO_SPEECH_MS = 9000;   // if nothing said this long, count as idle
 const AUTO_CLOSE_MS = 150000; // ~2.5 min of no real exchange -> close
 const HISTORY_TURNS = 6;     // shorter context = faster model response
 
-// Expo's LOW_QUALITY Android preset records 3GP/AMR audio. Addis does not
-// accept that format, so labelling those bytes as M4A made every Addis request
-// fail and unnecessarily triggered the Gemini backup. Keep the smaller bitrate,
-// but record a real MPEG-4/AAC mono file on native devices.
+// Expo's LOW_QUALITY Android preset records unsupported 3GP/AMR audio. Use the
+// known-good HIGH_QUALITY preset unchanged so each native device records a
+// standards-compliant MPEG-4/AAC clip; Addis mixes stereo down when necessary.
 const SPEECH_RECORDING = {
   ...RecordingPresets.HIGH_QUALITY,
-  numberOfChannels: 1,
-  bitRate: 64000,
   isMeteringEnabled: true,
-  android: {
-    ...RecordingPresets.HIGH_QUALITY.android,
-    extension: '.m4a',
-    outputFormat: 'mpeg4',
-    audioEncoder: 'aac',
-  },
-  web: {
-    ...RecordingPresets.HIGH_QUALITY.web,
-    bitsPerSecond: 64000,
-  },
 };
 
 function recordedMimeType(uri) {
@@ -75,6 +63,7 @@ export default function VoiceOverlay({ visible, onClose, token, lang = 'en', use
   const turnStartRef = useRef(0);
   const lastVoiceRef = useRef(0);
   const hadSpeechRef = useRef(false);
+  const speechFramesRef = useRef(0);
   const lastExchangeRef = useRef(0);
   const meteringOkRef = useRef(true);
   const runningRef = useRef(false);
@@ -136,6 +125,7 @@ export default function VoiceOverlay({ visible, onClose, token, lang = 'en', use
     turnStartRef.current = Date.now();
     lastVoiceRef.current = Date.now();
     hadSpeechRef.current = false;
+    speechFramesRef.current = 0;
 
     clearInterval(pollRef.current);
     pollRef.current = setInterval(() => {
@@ -143,7 +133,11 @@ export default function VoiceOverlay({ visible, onClose, token, lang = 'en', use
       let level;
       try { const st = recorder.getStatus ? recorder.getStatus() : null; level = st && (st.metering != null ? st.metering : undefined); } catch (_) {}
       if (typeof level === 'number') {
-        if (level > SPEAK_DB) { hadSpeechRef.current = true; lastVoiceRef.current = now; }
+        if (level > SPEAK_DB) {
+          speechFramesRef.current += 1;
+          hadSpeechRef.current = speechFramesRef.current >= 3;
+          lastVoiceRef.current = now;
+        }
       } else {
         meteringOkRef.current = false; // device gives no metering -> rely on caps/tap
       }
@@ -151,18 +145,18 @@ export default function VoiceOverlay({ visible, onClose, token, lang = 'en', use
       if (now - lastExchangeRef.current > AUTO_CLOSE_MS) { setCaption(''); onClose && onClose(); return; }
 
       if (meteringOkRef.current) {
-        if (hadSpeechRef.current && now - lastVoiceRef.current > SILENCE_MS) return endTurn();
+        if (hadSpeechRef.current && now - turnStartRef.current >= MIN_TURN_MS && now - lastVoiceRef.current > SILENCE_MS) return endTurn();
         if (!hadSpeechRef.current && now - turnStartRef.current > NO_SPEECH_MS) return restartListen();
       }
       if (now - turnStartRef.current > MAX_TURN_MS) return endTurn();
     }, POLL_MS);
   }
 
-  function restartListen() {
+  async function restartListen() {
     // No speech captured this window — quietly start a fresh listening window.
     clearInterval(pollRef.current); pollRef.current = null;
-    try { recorder.stop(); } catch (_) {}
-    if (runningRef.current) listen();
+    try { await recorder.stop(); } catch (_) {}
+    if (runningRef.current) await listen();
   }
 
   async function endTurn() {
