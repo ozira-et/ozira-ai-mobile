@@ -132,6 +132,8 @@ export const api = {
   storage: (token) => req('/api/storage', { token }),
   sessions: (token) => req('/api/sessions', { token }),
   revokeSession: (id, token) => req('/api/sessions/revoke', { body: { id }, token }),
+  profile: (token) => req('/api/profile', { token }),
+  saveProfile: (profile, token) => req('/api/profile', { body: { profile }, token }),
   // --- language ---
   settingsLang: (lang, token) => req('/api/settings/lang', { body: { lang }, token }),
   settings: (token) => req('/api/settings', { token }),

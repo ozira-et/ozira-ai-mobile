@@ -5,8 +5,9 @@
 //
 // The on-device file is still written on every successful call, demoted from
 // source of truth to a read cache: with no network the app shows the last known
-// list instead of an empty screen. Theme, settings and profile stay purely
-// local; they are device preferences, not account data.
+// list instead of an empty screen. Theme and settings stay local. Profile is
+// also cached here for instant display, but its source of truth is the account
+// API so it follows the user to web and other phones.
 import { Paths, File } from 'expo-file-system';
 import { api } from './api';
 
@@ -257,6 +258,17 @@ export async function purgeAllHistory() {
 export async function getProfile() {
   const s = await load();
   return s.profile || {};
+}
+export async function getProfileOwnerId() {
+  const s = await load();
+  return s.profileOwnerId || '';
+}
+export async function replaceProfile(profile, ownerId) {
+  const s = await load();
+  s.profile = { ...(profile || {}) };
+  s.profileOwnerId = ownerId || '';
+  await persist();
+  return s.profile;
 }
 export async function setProfile(patch) {
   const s = await load();

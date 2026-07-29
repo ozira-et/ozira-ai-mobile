@@ -2,7 +2,8 @@
 // The `token` here is Supabase's access token; the backend verifies it.
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../supabase';
-import { setToken } from '../api';
+import { api, absUrl, setToken } from '../api';
+import { getProfile as getLocalProfile, getProfileOwnerId, replaceProfile as replaceLocalProfile } from '../localStore';
 
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
@@ -21,6 +22,23 @@ export function AuthProvider({ children }) {
       const { data } = await supabase
         .from('profiles').select('*').eq('id', authUser.id).single();
       if (data) profile = data;
+    } catch (_) {}
+    try {
+      const local = await getLocalProfile();
+      const localOwnerId = await getProfileOwnerId();
+      const result = await api.profile(session.access_token);
+      let accountProfile = result.profile || {};
+      // One-time migration: profiles saved by older mobile builds only exist
+      // in the phone cache. Upload them when the account has no durable copy.
+      const belongsToThisAccount = !localOwnerId || localOwnerId === authUser.id;
+      const hasOldLocalProfile = belongsToThisAccount && Object.keys(local || {}).some(key => key !== 'horoscope');
+      if (!accountProfile.updatedAt && hasOldLocalProfile) {
+        const migrated = await api.saveProfile({ ...local, ...accountProfile }, session.access_token);
+        accountProfile = migrated.profile || accountProfile;
+      }
+      if (accountProfile.avatar) accountProfile.avatar = absUrl(accountProfile.avatar);
+      await replaceLocalProfile(accountProfile, authUser.id);
+      profile = { ...profile, ...accountProfile };
     } catch (_) {}
     setUser({ id: authUser.id, email: authUser.email, ...profile });
   }
@@ -81,12 +99,15 @@ export function AuthProvider({ children }) {
     await loadProfile(session);
   };
 
-  // Update the user's profile row in Supabase.
+  // Update the shared account profile used by mobile and web.
   const updateProfile = async (patch) => {
     if (!user?.id) return;
-    const { error } = await supabase.from('profiles').update(patch).eq('id', user.id);
-    if (error) throw new Error(error.message);
-    await refresh();
+    const result = await api.saveProfile(patch, token);
+    const saved = { ...(result.profile || {}) };
+    if (saved.avatar) saved.avatar = absUrl(saved.avatar);
+    await replaceLocalProfile(saved, user.id);
+    setUser(current => ({ ...(current || {}), ...saved }));
+    return saved;
   };
 
   return (

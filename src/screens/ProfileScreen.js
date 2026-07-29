@@ -9,7 +9,7 @@ import { useLang } from '../context/LanguageContext';
 import FlagMenu from '../components/FlagMenu';
 import { useAuth } from '../context/AuthContext';
 import { useUI } from '../context/UIContext';
-import { getProfile, setProfile } from '../localStore';
+import { getProfile } from '../localStore';
 import { zodiacFor, isValidBirthday } from '../zodiac';
 
 const INTERESTS = ['Business', 'Technology', 'Travel', 'Sports', 'Health', 'Education', 'Entertainment', 'News', 'Faith', 'Cooking', 'Fashion', 'Finance'];
@@ -19,7 +19,7 @@ export default function ProfileScreen() {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useLang();
-  const { user } = useAuth();
+  const { user, updateProfile } = useAuth();
   const { openSidebar } = useUI();
 
   const [avatar, setAvatar] = useState(null);
@@ -32,7 +32,11 @@ export default function ProfileScreen() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { (async () => {
-    const p = await getProfile();
+    const local = await getProfile();
+    const p = { ...local };
+    ['avatar', 'birthday', 'showZodiac', 'city', 'gender', 'interests', 'customInstructions'].forEach(key => {
+      if (user && user[key] !== undefined) p[key] = user[key];
+    });
     setAvatar(p.avatar || null);
     setBirthday(p.birthday || '');
     setShowZodiac(p.showZodiac !== false);
@@ -40,7 +44,7 @@ export default function ProfileScreen() {
     setGender(p.gender || '');
     setInterests(p.interests || []);
     setInstructions(p.customInstructions || '');
-  })(); }, []);
+  })(); }, [user?.id, user?.updatedAt]);
 
   const zodiac = zodiacFor(birthday);
 
@@ -60,9 +64,15 @@ export default function ProfileScreen() {
   async function save() {
     if (birthday && !isValidBirthday(birthday)) return Alert.alert('Check the date', 'Use the format YYYY-MM-DD, e.g. 1996-06-14.');
     setSaving(true);
-    await setProfile({ avatar, birthday, showZodiac, city, gender, interests, customInstructions: instructions });
-    setSaving(false);
-    Alert.alert('Saved', 'Your profile is updated.');
+    try {
+      const saved = await updateProfile({ avatar, birthday, showZodiac, city, gender, interests, customInstructions: instructions });
+      if (saved?.avatar) setAvatar(saved.avatar);
+      Alert.alert('Saved', 'Your profile is updated on all your devices.');
+    } catch (e) {
+      Alert.alert('Could not save', e.message || 'Check your connection and try again.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   const initial = (user?.name || user?.email || 'O').trim().charAt(0).toUpperCase();
