@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, Image, ImageBackground, Keyboard, Platform, ActivityIndicator, Modal, Alert, Share, Animated } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, Image, ImageBackground, Keyboard, Platform, ActivityIndicator, Modal, Alert, Share, Animated, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -23,6 +23,7 @@ import { getCachedConversation, getConversation, saveConversation, deleteConvers
 import Logo from '../components/Logo';
 import FlagMenu from '../components/FlagMenu';
 import VoiceOverlay from '../components/VoiceOverlay';
+import AssistantActionIcon from '../components/AssistantActionIcon';
 import { speakText, stopSpeaking } from '../tts';
 
 const FLAG = { green: '#078930', yellow: '#FCDD09', red: '#DA121A' };
@@ -89,6 +90,7 @@ function imageFromDataUrl(value) {
 
 export default function ChatConversationScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { token, user } = useAuth();
@@ -127,6 +129,9 @@ export default function ChatConversationScreen({ navigation, route }) {
   const [reactions, setReactions] = useState({});      // index -> 1 | -1
   const [speakBusy, setSpeakBusy] = useState(null);    // index currently loading audio
   const [speakingIdx, setSpeakingIdx] = useState(null);// index currently playing
+  const [copiedIdx, setCopiedIdx] = useState(null);    // temporary copy checkmark
+  const copiedTimerRef = useRef(null);
+  const [assistantMenu, setAssistantMenu] = useState(null); // { index, message }
   const [voiceOpen, setVoiceOpen] = useState(false);   // live voice overlay
   const [editIdx, setEditIdx] = useState(null);         // index of message being edited
   const [viewerImage, setViewerImage] = useState(null); // { url, id, prompt, index }
@@ -136,7 +141,10 @@ export default function ChatConversationScreen({ navigation, route }) {
   const [imageSaved, setImageSaved] = useState(false);
 
   useEffect(() => { getProfile().then(p => { instrRef.current = p.customInstructions || ''; }).catch(() => {}); }, []);
-  useEffect(() => () => stopSpeaking(), []);
+  useEffect(() => () => {
+    stopSpeaking();
+    if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+  }, []);
   useEffect(() => { setImageSaved(false); }, [viewerImage]);
   useEffect(() => {
     const sourceImage = route.params?.sourceImage;
@@ -336,10 +344,16 @@ export default function ChatConversationScreen({ navigation, route }) {
   }
 
   // ---- per-message actions ----
-  async function copyMsg(m) {
+  async function copyMsg(m, index) {
     try { await Clipboard.setStringAsync(typeof m.content === 'string' ? m.content : ''); } catch (_) {}
+    if (index != null) {
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+      setCopiedIdx(index);
+      copiedTimerRef.current = setTimeout(() => setCopiedIdx(null), 1800);
+    }
   }
   async function shareMsg(m) {
+    if (m.image) return shareGeneratedImage(m.image);
     try { await Share.share({ message: typeof m.content === 'string' ? m.content : '' }); } catch (_) {}
   }
   async function shareGeneratedImage(uri) {
@@ -440,12 +454,9 @@ export default function ChatConversationScreen({ navigation, route }) {
     if (!text) return;
     send(text, false, { forceResearch: true });
   }
-  function openAssistantActions(i, m) {
-    Alert.alert('More actions', undefined, [
-      { text: 'Regenerate answer', onPress: () => regenerate(i) },
-      { text: 'Search the web', onPress: () => webSearch(m) },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+  function openAssistantActions(i, m, event) {
+    const { pageX, pageY } = event?.nativeEvent || {};
+    setAssistantMenu({ index: i, message: m, pageX, pageY });
   }
   async function onSpeak(i, m) {
     // Tapping the speaker of the message that's playing/loading stops it.
@@ -681,28 +692,31 @@ export default function ChatConversationScreen({ navigation, route }) {
             ) : (
               <Text style={[styles.msgTxt, rtlText(rtl), { color: colors.text }]}>{m.content}</Text>
             )}
-            {!m.image && !m.pending && m.content ? (
+            {!m.pending && m.content ? (
               <View style={[styles.actionRow, m.role === 'assistant' && styles.assistantActionRow]}>
                 {m.role === 'assistant' ? (
                   <>
-                    <Pressable onPress={() => copyMsg(m)} style={styles.actBtn} accessibilityRole="button" accessibilityLabel="Copy answer">
-                      <Ionicons name="copy-outline" size={23} color={colors.muted} />
+                    <Pressable onPress={() => copyMsg(m, i)} style={({ pressed }) => [styles.assistantActBtn, pressed && styles.assistantActPressed]} accessibilityRole="button" accessibilityLabel="Copy">
+                      <AssistantActionIcon name={copiedIdx === i ? 'check' : 'copy'} size={20} color={copiedIdx === i ? colors.text : colors.muted} />
                     </Pressable>
-                    <Pressable onPress={() => onSpeak(i, m)} style={styles.actBtn} accessibilityRole="button" accessibilityLabel="Read answer aloud">
+                    <Pressable onPress={() => onSpeak(i, m)} style={({ pressed }) => [styles.assistantActBtn, speakingIdx === i && styles.assistantActSelected, pressed && styles.assistantActPressed]} accessibilityRole="button" accessibilityLabel="Read aloud" accessibilityState={{ selected: speakingIdx === i, busy: speakBusy === i }}>
                       {speakBusy === i ? (
-                        <ActivityIndicator size="small" color={colors.primary} />
+                        <ActivityIndicator size="small" color={colors.muted} />
                       ) : (
-                        <Ionicons name={speakingIdx === i ? 'stop-circle-outline' : 'volume-high-outline'} size={24} color={speakingIdx === i ? colors.primary : colors.muted} />
+                        <AssistantActionIcon name={speakingIdx === i ? 'stop' : 'volume'} size={20} color={speakingIdx === i ? colors.text : colors.muted} />
                       )}
                     </Pressable>
-                    <Pressable onPress={() => react(i, m, -1)} style={styles.actBtn} accessibilityRole="button" accessibilityLabel="Dislike answer">
-                      <Ionicons name={m.reaction === -1 ? 'thumbs-down' : 'thumbs-down-outline'} size={23} color={m.reaction === -1 ? colors.danger : colors.muted} />
+                    <Pressable onPress={() => react(i, m, 1)} style={({ pressed }) => [styles.assistantActBtn, m.reaction === 1 && styles.assistantActSelected, pressed && styles.assistantActPressed]} accessibilityRole="button" accessibilityLabel="Good response" accessibilityState={{ selected: m.reaction === 1 }}>
+                      <AssistantActionIcon name="like" size={20} color={m.reaction === 1 ? colors.text : colors.muted} />
                     </Pressable>
-                    <Pressable onPress={() => shareMsg(m)} style={styles.actBtn} accessibilityRole="button" accessibilityLabel="Share answer">
-                      <Ionicons name="share-outline" size={24} color={colors.muted} />
+                    <Pressable onPress={() => react(i, m, -1)} style={({ pressed }) => [styles.assistantActBtn, m.reaction === -1 && styles.assistantActSelected, pressed && styles.assistantActPressed]} accessibilityRole="button" accessibilityLabel="Bad response" accessibilityState={{ selected: m.reaction === -1 }}>
+                      <AssistantActionIcon name="dislike" size={20} color={m.reaction === -1 ? colors.text : colors.muted} />
                     </Pressable>
-                    <Pressable onPress={() => openAssistantActions(i, m)} style={styles.actBtn} accessibilityRole="button" accessibilityLabel="More answer actions">
-                      <Ionicons name="ellipsis-horizontal" size={25} color={colors.muted} />
+                    <Pressable onPress={() => shareMsg(m)} style={({ pressed }) => [styles.assistantActBtn, pressed && styles.assistantActPressed]} accessibilityRole="button" accessibilityLabel="Share">
+                      <AssistantActionIcon name="share" size={20} color={colors.muted} />
+                    </Pressable>
+                    <Pressable onPress={(event) => openAssistantActions(i, m, event)} style={({ pressed }) => [styles.assistantActBtn, pressed && styles.assistantActPressed]} accessibilityRole="button" accessibilityLabel="More">
+                      <AssistantActionIcon name="more" size={20} color={colors.muted} />
                     </Pressable>
                   </>
                 ) : (
@@ -820,6 +834,51 @@ export default function ChatConversationScreen({ navigation, route }) {
             <Pressable style={({ pressed }) => [styles.convItem, pressed && styles.convItemPressed]} onPress={deleteThis}>
               <Ionicons name="trash-outline" size={18} color={colors.danger} />
               <Text style={[styles.convItemTxt, { color: colors.danger }]}>Delete</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={!!assistantMenu} transparent animationType="fade" onRequestClose={() => setAssistantMenu(null)}>
+        <Pressable style={styles.actionMenuBackdrop} onPress={() => setAssistantMenu(null)}>
+          <View style={[
+            styles.actionMenu,
+            {
+              right: Math.max(12, Math.min(windowWidth - 232, windowWidth - (assistantMenu?.pageX ?? windowWidth - 34) - 22)),
+              top: (() => {
+                const anchorY = assistantMenu?.pageY ?? (windowHeight / 2);
+                const below = anchorY + 24;
+                return below + 106 <= windowHeight - insets.bottom
+                  ? below
+                  : Math.max(insets.top + 8, anchorY - 130);
+              })(),
+            },
+          ]}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Regenerate answer"
+              style={({ pressed }) => [styles.actionMenuItem, pressed && styles.convItemPressed]}
+              onPress={() => {
+                const index = assistantMenu?.index;
+                setAssistantMenu(null);
+                if (index != null) regenerate(index);
+              }}
+            >
+              <Ionicons name="refresh-outline" size={18} color={colors.text} />
+              <Text style={styles.actionMenuText}>Regenerate answer</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Search the web"
+              style={({ pressed }) => [styles.actionMenuItem, pressed && styles.convItemPressed]}
+              onPress={() => {
+                const message = assistantMenu?.message;
+                setAssistantMenu(null);
+                if (message) webSearch(message);
+              }}
+            >
+              <Ionicons name="globe-outline" size={18} color={colors.text} />
+              <Text style={styles.actionMenuText}>Search the web</Text>
             </Pressable>
           </View>
         </Pressable>
@@ -972,9 +1031,20 @@ const makeStyles = (colors) => StyleSheet.create({
   modeDropTitle: { color: colors.text, fontFamily: fonts.semibold, fontSize: 13, lineHeight: 18 },
   modeDropSub: { color: colors.muted, fontFamily: fonts.regular, fontSize: 11, lineHeight: 15, marginTop: 2 },
   actionRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 },
-  assistantActionRow: { gap: 8, marginTop: 10 },
+  assistantActionRow: { gap: 2, marginTop: 8, alignSelf: 'flex-start' },
   // Separate touch targets avoid overlapping actions while keeping the row compact.
   actBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 9 },
+  assistantActBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: 'transparent' },
+  assistantActPressed: { backgroundColor: colors.border + '88' },
+  assistantActSelected: { backgroundColor: colors.border + '66' },
+  actionMenuBackdrop: { flex: 1, backgroundColor: 'transparent' },
+  actionMenu: {
+    position: 'absolute', width: 220, backgroundColor: colors.surface, borderRadius: 12, padding: 5,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border,
+    shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 9,
+  },
+  actionMenuItem: { minHeight: 44, paddingHorizontal: 11, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  actionMenuText: { color: colors.text, fontFamily: fonts.medium, fontSize: 14 },
   moreBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.primary + '12', alignItems: 'center', justifyContent: 'center' },
   convMenuBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.26)', alignItems: 'flex-end', paddingRight: 12 },
   convMenu: {
