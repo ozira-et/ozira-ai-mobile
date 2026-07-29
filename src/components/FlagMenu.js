@@ -8,7 +8,22 @@ export default function FlagMenu({ onPress, size = 24 }) {
   const barH = Math.max(2.5, size / 8);
   const bar = (color) => ({ width: size, height: barH, borderRadius: barH, backgroundColor: color });
   return (
-    <Pressable onPress={onPress} hitSlop={12} style={{ justifyContent: 'center', gap: barH * 1.5 }}>
+    <Pressable
+      onPress={onPress}
+      hitSlop={4}
+      pressRetentionOffset={12}
+      accessibilityRole="button"
+      accessibilityLabel="Open menu"
+      android_ripple={{ color: 'rgba(179,18,27,0.16)', borderless: true, radius: 22 }}
+      style={({ pressed }) => ({
+        width: 44,
+        height: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: barH * 1.5,
+        opacity: pressed ? 0.68 : 1,
+      })}
+    >
       <View style={bar(FLAG.green)} />
       <View style={bar(FLAG.yellow)} />
       <View style={bar(FLAG.red)} />

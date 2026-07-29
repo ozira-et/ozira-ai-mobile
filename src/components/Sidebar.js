@@ -129,7 +129,11 @@ export default function Sidebar() {
   const zodiac = profile.showZodiac !== false ? zodiacFor(profile.birthday) : null;
 
   return (
-    <View pointerEvents={sidebarOpen ? 'auto' : 'none'} style={StyleSheet.absoluteFill}>
+    <View
+      pointerEvents={sidebarOpen ? 'auto' : 'none'}
+      collapsable={false}
+      style={[StyleSheet.absoluteFillObject, styles.overlayRoot]}
+    >
       <Animated.View style={[styles.backdrop, { opacity: fade }]}>
         <Pressable style={{ flex: 1 }} onPress={closeSidebar} />
       </Animated.View>
@@ -228,6 +232,7 @@ export default function Sidebar() {
 }
 
 const makeStyles = (colors) => StyleSheet.create({
+  overlayRoot: { zIndex: 1000, elevation: 1000 },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
   panel: { position: 'absolute', top: 0, bottom: 0, left: 0, backgroundColor: '#210913', overflow: 'hidden' },
   panelImage: { flex: 1 },
