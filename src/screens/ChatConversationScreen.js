@@ -697,26 +697,26 @@ export default function ChatConversationScreen({ navigation, route }) {
                 {m.role === 'assistant' ? (
                   <>
                     <Pressable onPress={() => copyMsg(m, i)} style={({ pressed }) => [styles.assistantActBtn, pressed && styles.assistantActPressed]} accessibilityRole="button" accessibilityLabel="Copy">
-                      <AssistantActionIcon name={copiedIdx === i ? 'check' : 'copy'} size={20} color={copiedIdx === i ? colors.text : colors.muted} />
+                      <AssistantActionIcon name={copiedIdx === i ? 'check' : 'copy'} size={18} color={copiedIdx === i ? colors.text : colors.muted} />
                     </Pressable>
                     <Pressable onPress={() => onSpeak(i, m)} style={({ pressed }) => [styles.assistantActBtn, speakingIdx === i && styles.assistantActSelected, pressed && styles.assistantActPressed]} accessibilityRole="button" accessibilityLabel="Read aloud" accessibilityState={{ selected: speakingIdx === i, busy: speakBusy === i }}>
                       {speakBusy === i ? (
                         <ActivityIndicator size="small" color={colors.muted} />
                       ) : (
-                        <AssistantActionIcon name={speakingIdx === i ? 'stop' : 'volume'} size={20} color={speakingIdx === i ? colors.text : colors.muted} />
+                        <AssistantActionIcon name={speakingIdx === i ? 'stop' : 'volume'} size={18} color={speakingIdx === i ? colors.text : colors.muted} />
                       )}
                     </Pressable>
                     <Pressable onPress={() => react(i, m, 1)} style={({ pressed }) => [styles.assistantActBtn, m.reaction === 1 && styles.assistantActSelected, pressed && styles.assistantActPressed]} accessibilityRole="button" accessibilityLabel="Good response" accessibilityState={{ selected: m.reaction === 1 }}>
-                      <AssistantActionIcon name="like" size={20} color={m.reaction === 1 ? colors.text : colors.muted} />
+                      <AssistantActionIcon name="like" size={18} color={m.reaction === 1 ? colors.text : colors.muted} />
                     </Pressable>
                     <Pressable onPress={() => react(i, m, -1)} style={({ pressed }) => [styles.assistantActBtn, m.reaction === -1 && styles.assistantActSelected, pressed && styles.assistantActPressed]} accessibilityRole="button" accessibilityLabel="Bad response" accessibilityState={{ selected: m.reaction === -1 }}>
-                      <AssistantActionIcon name="dislike" size={20} color={m.reaction === -1 ? colors.text : colors.muted} />
+                      <AssistantActionIcon name="dislike" size={18} color={m.reaction === -1 ? colors.text : colors.muted} />
                     </Pressable>
                     <Pressable onPress={() => shareMsg(m)} style={({ pressed }) => [styles.assistantActBtn, pressed && styles.assistantActPressed]} accessibilityRole="button" accessibilityLabel="Share">
-                      <AssistantActionIcon name="share" size={20} color={colors.muted} />
+                      <AssistantActionIcon name="share" size={18} color={colors.muted} />
                     </Pressable>
                     <Pressable onPress={(event) => openAssistantActions(i, m, event)} style={({ pressed }) => [styles.assistantActBtn, pressed && styles.assistantActPressed]} accessibilityRole="button" accessibilityLabel="More">
-                      <AssistantActionIcon name="more" size={20} color={colors.muted} />
+                      <AssistantActionIcon name="more" size={18} color={colors.muted} />
                     </Pressable>
                   </>
                 ) : (
@@ -1030,11 +1030,14 @@ const makeStyles = (colors) => StyleSheet.create({
   modeDropOn: { backgroundColor: colors.primary + '16' },
   modeDropTitle: { color: colors.text, fontFamily: fonts.semibold, fontSize: 13, lineHeight: 18 },
   modeDropSub: { color: colors.muted, fontFamily: fonts.regular, fontSize: 11, lineHeight: 15, marginTop: 2 },
-  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 },
-  assistantActionRow: { gap: 2, marginTop: 8, alignSelf: 'flex-start' },
-  // Separate touch targets avoid overlapping actions while keeping the row compact.
-  actBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 9 },
-  assistantActBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: 'transparent' },
+  // Matches the web action row's density (18px glyphs, 2px apart, 6px above the
+  // row) while keeping 44px hit areas: 32px would read the same but sits under
+  // the 44px minimum touch target both platforms recommend, and there are six
+  // of these side by side.
+  actionRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 6, alignSelf: 'flex-start' },
+  assistantActionRow: { gap: 2, marginTop: 6, alignSelf: 'flex-start' },
+  actBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 6 },
+  assistantActBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: 'transparent' },
   assistantActPressed: { backgroundColor: colors.border + '88' },
   assistantActSelected: { backgroundColor: colors.border + '66' },
   actionMenuBackdrop: { flex: 1, backgroundColor: 'transparent' },

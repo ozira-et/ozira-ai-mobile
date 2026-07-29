@@ -3,11 +3,13 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 // A deliberately small monochrome outline set for the assistant action row.
 // Every glyph shares ChatGPT's rounded 1.8px visual weight.
-export default function AssistantActionIcon({ name, color, size = 20 }) {
+export default function AssistantActionIcon({ name, color, size = 18, strokeWidth = 1.7 }) {
   const common = {
     fill: 'none',
     stroke: color,
-    strokeWidth: 1.8,
+    // 1.7 matches the web action row, so the same glyph reads identically in
+    // both apps rather than looking heavier on the phone.
+    strokeWidth,
     strokeLinecap: 'round',
     strokeLinejoin: 'round',
   };
