@@ -135,7 +135,11 @@ export default function VoiceOverlay({ visible, onClose, token, lang = 'en', use
   async function endTurn() {
     clearInterval(pollRef.current); pollRef.current = null;
     if (!runningRef.current) return;
+    // Clear the previous turn only when new speech is being processed. Doing
+    // this in listen() would erase a useful failure immediately.
+    setError('');
     setStatus('hearing');
+    let currentStage = 'Speech recognition';
     try {
       const t0 = Date.now();
       await recorder.stop();
@@ -149,12 +153,13 @@ export default function VoiceOverlay({ visible, onClose, token, lang = 'en', use
         // Show why nothing happened instead of looping in silence: a real error
         // (STT down, not configured) is different from just not hearing speech.
         const why = d && (d.error || d.notice);
-        if (why) setCaption('⚠️ ' + why);
+        if (why) setError('Speech recognition: ' + why);
         if (runningRef.current) return listen();
         return;
       }
       setCaption('“' + text + '”');
       setStatus('thinking');
+      currentStage = 'AI reply';
       const t1 = Date.now();
 
       // Brevity is the single biggest latency lever: the whole reply has to be
@@ -176,15 +181,16 @@ export default function VoiceOverlay({ visible, onClose, token, lang = 'en', use
 
       if (!runningRef.current) return;
       setStatus('speaking');
+      currentStage = 'Voice playback';
       const t2 = Date.now();
       const spoken = await speakText(answer, token, () => { if (runningRef.current) listen(); });
       setTiming(x => ({ ...x, tts: Date.now() - t2 }));
       if (!spoken?.ok) {
-        setError(spoken?.message || 'Could not play the spoken reply.');
+        setError('Voice playback: ' + (spoken?.message || 'Could not play the spoken reply.'));
         if (runningRef.current) listen();
       }
     } catch (e) {
-      setError(e.message || 'Voice error');
+      setError(currentStage + ': ' + (e.message || 'Voice error'));
       if (runningRef.current) listen();
     }
   }
