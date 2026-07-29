@@ -304,15 +304,13 @@ export default function ChatConversationScreen({ navigation, route }) {
     if (!uri || savingImage) return;
     setSavingImage(true);
     try {
-      const permission = await MediaLibrary.requestPermissionsAsync(true, ['photo']);
-      if (!permission.granted) {
-        Alert.alert('Photo permission needed', 'Allow OZIRA AI to save images in your phone settings.');
-        return;
-      }
       const clean = uri.split('?')[0].toLowerCase();
       const ext = clean.endsWith('.webp') ? 'webp' : (clean.endsWith('.jpg') || clean.endsWith('.jpeg')) ? 'jpg' : 'png';
       const destination = new File(Paths.cache, `ozira-image-${Date.now()}.${ext}`);
       const downloaded = await File.downloadFileAsync(uri, destination, { idempotent: true });
+      // Saving an app-created file does not require broad photo-library read
+      // permission on modern Android or in Expo Go. Requesting it first can be
+      // rejected before saveToLibraryAsync gets a chance to write the image.
       await MediaLibrary.saveToLibraryAsync(downloaded.uri);
       notify(t('notifSaved'), '', 'success');
     } catch (e) {
