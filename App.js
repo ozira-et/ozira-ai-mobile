@@ -15,12 +15,16 @@ import { navigationRef } from './src/navigation/navigationRef';
 import RootNavigator from './src/navigation/RootNavigator';
 import Splash from './src/components/Splash';
 
-function Themed() {
+function Themed({ splashVisible }) {
   const { resolved } = useThemeMode();
   return (
     <NavigationContainer ref={navigationRef} theme={navThemeFor(resolved)}>
       <RootNavigator />
-      <StatusBar style={resolved === 'light' ? 'dark' : 'light'} />
+      <StatusBar
+        style={splashVisible ? 'light' : (resolved === 'light' ? 'dark' : 'light')}
+        backgroundColor={splashVisible ? '#0B0B12' : 'transparent'}
+        translucent
+      />
     </NavigationContainer>
   );
 }
@@ -43,7 +47,7 @@ export default function App() {
             <LanguageProvider>
               <UIProvider>
                 <NotifyProvider>
-                  <Themed />
+                  <Themed splashVisible={!splashDone} />
                 </NotifyProvider>
               </UIProvider>
             </LanguageProvider>

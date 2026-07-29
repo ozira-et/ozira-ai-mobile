@@ -35,6 +35,16 @@
         "android.permission.BLUETOOTH"
       ]
     },
+    "androidStatusBar": {
+      "backgroundColor": "#0B0B12",
+      "barStyle": "light-content",
+      "translucent": true
+    },
+    "androidNavigationBar": {
+      "backgroundColor": "#0B0B12",
+      "barStyle": "light-content",
+      "contrastEnforced": false
+    },
     "plugins": [
       "expo-audio",
       [

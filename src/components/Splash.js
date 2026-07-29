@@ -2,7 +2,7 @@
 // keyframes share one Africa silhouette, so short cross-fades read as a single
 // continuous material transformation instead of a slideshow.
 import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, View } from 'react-native';
+import { Animated, Easing, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Asset } from 'expo-asset';
 import { LinearGradient } from 'expo-linear-gradient';
 import Logo from './Logo';
@@ -45,7 +45,14 @@ const PARTICLES = [
 ];
 
 export default function Splash({ onDone }) {
+  const { width, height } = useWindowDimensions();
   const progress = useRef(new Animated.Value(0)).current;
+  // The source artwork is 9:16, while many modern phones are 9:19.5 or
+  // taller. A soft full-bleed copy extends the scene to the physical screen
+  // and the sharp copy remains at its native ratio, avoiding both stretching
+  // and accidental cropping of the landmarks.
+  const screenRatio = height > 0 ? width / height : 9 / 16;
+  const needsRatioExtension = screenRatio < 0.54;
 
   useEffect(() => {
     let active = true;
@@ -78,16 +85,6 @@ export default function Splash({ onDone }) {
   const rootOpacity = progress.interpolate({
     inputRange: [0, 1900, 2000],
     outputRange: [1, 1, 0],
-    extrapolate: 'clamp',
-  });
-  const journeyScale = progress.interpolate({
-    inputRange: [0, 1300],
-    outputRange: [1.075, 1],
-    extrapolate: 'clamp',
-  });
-  const journeyLift = progress.interpolate({
-    inputRange: [0, 1300],
-    outputRange: [18, -8],
     extrapolate: 'clamp',
   });
   const mistOpacity = progress.interpolate({
@@ -129,10 +126,7 @@ export default function Splash({ onDone }) {
   return (
     <Animated.View pointerEvents="none" style={[styles.root, { opacity: rootOpacity }]}>
       <Animated.View
-        style={[
-          StyleSheet.absoluteFillObject,
-          { transform: [{ translateY: journeyLift }, { scale: journeyScale }] },
-        ]}
+        style={StyleSheet.absoluteFillObject}
       >
         {FRAMES.map((source, index) => {
           const [fadeIn, visible, fadeOut, gone] = SCENE_WINDOWS[index];
@@ -142,15 +136,28 @@ export default function Splash({ onDone }) {
             extrapolate: 'clamp',
           });
           return (
-            <Animated.Image
-              key={index}
-              source={source}
-              resizeMode="cover"
-              fadeDuration={0}
-              style={[StyleSheet.absoluteFillObject, { opacity }]}
-            />
+            <React.Fragment key={index}>
+              <Animated.Image
+                source={source}
+                resizeMode="cover"
+                blurRadius={needsRatioExtension ? 18 : 0}
+                fadeDuration={0}
+                style={[
+                  StyleSheet.absoluteFillObject,
+                  styles.sceneExtension,
+                  { opacity },
+                ]}
+              />
+              <Animated.Image
+                source={source}
+                resizeMode={needsRatioExtension ? 'contain' : 'cover'}
+                fadeDuration={0}
+                style={[StyleSheet.absoluteFillObject, { opacity }]}
+              />
+            </React.Fragment>
           );
         })}
+        {needsRatioExtension && <View style={styles.ratioBlend} />}
       </Animated.View>
 
       <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: mistOpacity }]}>
@@ -219,6 +226,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: BG,
+  },
+  sceneExtension: {
+    transform: [{ scale: 1.035 }],
+  },
+  ratioBlend: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(11,11,18,0.08)',
   },
   particle: {
     position: 'absolute',
