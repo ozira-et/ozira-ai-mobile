@@ -120,9 +120,11 @@ export default function ChatConversationScreen({ navigation, route }) {
   const [editIdx, setEditIdx] = useState(null);         // index of message being edited
   const [viewerImage, setViewerImage] = useState(null); // full-screen generated image
   const [savingImage, setSavingImage] = useState(false);
+  const [imageSaved, setImageSaved] = useState(false);
 
   useEffect(() => { getProfile().then(p => { instrRef.current = p.customInstructions || ''; }).catch(() => {}); }, []);
   useEffect(() => () => stopSpeaking(), []);
+  useEffect(() => { setImageSaved(false); }, [viewerImage]);
   useEffect(() => {
     const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
@@ -303,6 +305,7 @@ export default function ChatConversationScreen({ navigation, route }) {
   async function saveGeneratedImage(uri) {
     if (!uri || savingImage) return;
     setSavingImage(true);
+    setImageSaved(false);
     try {
       const clean = uri.split('?')[0].toLowerCase();
       const ext = clean.endsWith('.webp') ? 'webp' : (clean.endsWith('.jpg') || clean.endsWith('.jpeg')) ? 'jpg' : 'png';
@@ -312,6 +315,7 @@ export default function ChatConversationScreen({ navigation, route }) {
       // permission on modern Android or in Expo Go. Requesting it first can be
       // rejected before saveToLibraryAsync gets a chance to write the image.
       await MediaLibrary.saveToLibraryAsync(downloaded.uri);
+      setImageSaved(true);
       notify(t('notifSaved'), '', 'success');
     } catch (e) {
       Alert.alert('Could not save image', e.message || 'Please try again.');
@@ -762,16 +766,28 @@ export default function ChatConversationScreen({ navigation, route }) {
               <Pressable style={styles.viewerIconBtn} onPress={() => shareGeneratedImage(viewerImage)} accessibilityRole="button" accessibilityLabel="Share image">
                 <Ionicons name="share-outline" size={22} color="#FFFFFF" />
               </Pressable>
-              <Pressable style={styles.viewerSaveBtn} onPress={() => saveGeneratedImage(viewerImage)} disabled={savingImage} accessibilityRole="button" accessibilityLabel="Save image">
+              <Pressable
+                style={[styles.viewerSaveBtn, imageSaved && styles.viewerSaveBtnDone]}
+                onPress={() => saveGeneratedImage(viewerImage)}
+                disabled={savingImage}
+                accessibilityRole="button"
+                accessibilityLabel={imageSaved ? t('notifSaved') : t('saveImage')}
+              >
                 {savingImage
                   ? <ActivityIndicator size="small" color="#FFFFFF" />
-                  : <Ionicons name="download-outline" size={20} color="#FFFFFF" />}
-                {!savingImage && <Text style={styles.viewerSaveTxt}>{t('notifSaved')}</Text>}
+                  : <Ionicons name={imageSaved ? 'checkmark-circle' : 'download-outline'} size={20} color="#FFFFFF" />}
+                {!savingImage && <Text style={styles.viewerSaveTxt}>{imageSaved ? t('notifSaved') : t('saveImage')}</Text>}
               </Pressable>
             </View>
           </View>
           <Pressable style={styles.imageViewerBody} onPress={() => setViewerImage(null)}>
             {!!viewerImage && <Image source={{ uri: viewerImage }} style={styles.imageViewerImage} resizeMode="contain" />}
+            {imageSaved && (
+              <View pointerEvents="none" style={styles.viewerSavedBadge}>
+                <Ionicons name="checkmark-circle" size={22} color="#FFFFFF" />
+                <Text style={styles.viewerSavedBadgeTxt}>{t('savedToPhotos')}</Text>
+              </View>
+            )}
           </Pressable>
         </View>
       </Modal>
@@ -913,9 +929,19 @@ const makeStyles = (colors) => StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
     backgroundColor: colors.primary,
   },
+  viewerSaveBtnDone: { backgroundColor: '#078930' },
   viewerSaveTxt: { color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 13 },
   imageViewerBody: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 10 },
   imageViewerImage: { width: '100%', height: '100%' },
+  viewerSavedBadge: {
+    position: 'absolute', bottom: 28, alignSelf: 'center',
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 17, height: 46, borderRadius: 23,
+    backgroundColor: 'rgba(7,137,48,0.96)',
+    shadowColor: '#000', shadowOpacity: 0.28, shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 }, elevation: 8,
+  },
+  viewerSavedBadgeTxt: { color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 14 },
   composer: {
     paddingHorizontal: 12, paddingTop: 8, backgroundColor: colors.bg,
     borderTopWidth: 1, borderTopColor: colors.border,
