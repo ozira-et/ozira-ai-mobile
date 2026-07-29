@@ -82,10 +82,19 @@ async function ensureMigrated() {
   s.migratedToAccount = true;
   await persist();
 }
+let migrationInFlight = null;
+function migrateInBackground() {
+  if (!migrationInFlight) {
+    migrationInFlight = ensureMigrated().finally(() => { migrationInFlight = null; });
+  }
+  return migrationInFlight;
+}
 
 export async function listConversations(folderId, opts = {}) {
   try {
-    await ensureMigrated();
+    // Migration can involve many old local chats and used to block the entire
+    // history screen. It is safe to let it finish in the background.
+    migrateInBackground().catch(() => {});
     const d = await api.conversations(opts.archived ? '__archived' : folderId);
     const list = (d.conversations || []).map(c => ({
       id: c.id, title: c.title, folderId: c.folderId || null,
@@ -117,16 +126,27 @@ export async function setConversationMeta(id, patch) {
   try { await api.conversationMeta(rid, patch); } catch (_) {}
 }
 
+// Read the on-device copy without touching the network. Chat screens use this
+// first so a conversation opens immediately, then refresh from the account.
+export async function getCachedConversation(id) {
+  const rid = await serverId(id);
+  const s = await load();
+  return s.conversations[rid] || s.conversations[id] || null;
+}
+
 export async function getConversation(id) {
   const rid = await serverId(id);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
   try {
-    const d = await api.getConversation(rid);
+    const d = await api.getConversation(rid, undefined, controller.signal);
     const c = d.conversation;
     if (c) { await cacheConv({ id: c.id, title: c.title, messages: c.messages || [], folderId: c.folderId || null, pinned: !!c.pinned, archived: !!c.archived }); }
     return c ? { ...c, id: c.id } : null;
   } catch (_) {
-    const s = await load();
-    return s.conversations[rid] || s.conversations[id] || null;
+    return getCachedConversation(id);
+  } finally {
+    clearTimeout(timer);
   }
 }
 

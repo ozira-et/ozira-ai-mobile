@@ -58,7 +58,7 @@ export const api = {
   image: (payload, token, signal) => req('/api/image', { body: payload, token, signal }),
   imageEdit: (payload, token, signal) => req('/api/image/edit', { body: payload, token, signal }),
   conversations: (folderId, token) => req('/api/conversations' + (folderId ? '?folder=' + encodeURIComponent(folderId) : ''), { token }),
-  getConversation: (id, token) => req('/api/conversations/get', { body: { id }, token }),
+  getConversation: (id, token, signal) => req('/api/conversations/get', { body: { id }, token, signal }),
   saveConversation: (conv, token) => req('/api/conversations/save', { body: conv, token }),
   deleteConversation: (id, token) => req('/api/conversations/delete', { body: { id }, token }),
   conversationMeta: (id, patch, token) => req('/api/conversations/meta', { body: { id, ...patch }, token }),

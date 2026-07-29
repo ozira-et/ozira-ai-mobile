@@ -17,7 +17,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
-import { getConversation, saveConversation, deleteConversation, setConversationMeta, setConversationFolder, listFolders, newId, getProfile } from '../localStore';
+import { getCachedConversation, getConversation, saveConversation, deleteConversation, setConversationMeta, setConversationFolder, listFolders, newId, getProfile } from '../localStore';
 import Logo from '../components/Logo';
 import FlagMenu from '../components/FlagMenu';
 import VoiceOverlay from '../components/VoiceOverlay';
@@ -214,10 +214,11 @@ export default function ChatConversationScreen({ navigation, route }) {
   useEffect(() => {
     const id = route.params?.conversationId;
     if (!id) return;
+    let active = true;
     setConvId(id);
-    (async () => {
-      const c = await getConversation(id);
-      const restored = c && c.messages ? c.messages.map(m => ({
+    const showConversation = c => {
+      if (!active || !c) return;
+      const restored = c.messages ? c.messages.map(m => ({
         ...m,
         content: typeof m.content === 'string' ? m.content : '',
         // Web stores server-relative image URLs; React Native needs an absolute
@@ -225,11 +226,18 @@ export default function ChatConversationScreen({ navigation, route }) {
         ...(m.image ? { image: absUrl(m.image) } : {}),
       })) : [];
       setMessages(restored);
-      // Continue an image thread as an image thread after changing device.
       setImageMode(!!route.params?.imageMode || restored.some(m => m.image));
-      setPinned(!!(c && c.pinned));
+      setPinned(!!c.pinned);
       setReactions({});
+    };
+    (async () => {
+      // Paint the cached thread first; on a normal reopen this takes only a
+      // local file read instead of a full network round trip.
+      showConversation(await getCachedConversation(id));
+      // Refresh silently so changes made on web or another phone still arrive.
+      showConversation(await getConversation(id));
     })();
+    return () => { active = false; };
   }, [route.params?.conversationId]);
 
   // ---- conversation actions (top-right ⋯ menu) ----
