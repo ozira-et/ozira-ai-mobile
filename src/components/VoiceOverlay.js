@@ -10,7 +10,7 @@ import Logo from './Logo';
 import { api } from '../api';
 import { File } from 'expo-file-system';
 import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
-import { ensurePrepared, releaseRecorder } from '../audioSession';
+import { ensurePrepared, releaseRecorder, finalizeRecording } from '../audioSession';
 import { speakText, stopSpeaking } from '../tts';
 import { t as translate } from '../i18n';
 
@@ -218,13 +218,17 @@ export default function VoiceOverlay({ visible, onClose, token, lang = 'en', use
     let currentStage = 'Speech recognition';
     try {
       const t0 = Date.now();
-      await releaseRecorderSession();
+      // Stop AND wait for the encoder to finish writing before reading: an
+      // MPEG-4 read mid-write has audio but no index, and every decoder rejects
+      // it — which surfaced as "no speech detected" on a 221KB upload.
+      const { uri, size } = await finalizeRecording(recorder);
+      preparedRef.current = false;
       if (session !== sessionRef.current || !runningRef.current) {
         transitionRef.current = false;
         return;
       }
-      const uri = recorder.uri;
       if (!uri) return resumeListening();
+      if (!size) { setError('The recording came out empty. Check the microphone permission and try again.'); return resumeListening(); }
       const b64 = await new File(uri).base64();
       const d = await api.aiTranscribe(b64, recordedMimeType(uri), token);
       setTiming(x => ({ ...x, stt: Date.now() - t0 }));

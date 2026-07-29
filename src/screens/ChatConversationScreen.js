@@ -18,7 +18,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
-import { ensurePrepared, releaseRecorder } from '../audioSession';
+import { ensurePrepared, finalizeRecording } from '../audioSession';
 import { getCachedConversation, getConversation, saveConversation, deleteConversation, setConversationMeta, setConversationFolder, listFolders, newId, getProfile } from '../localStore';
 import Logo from '../components/Logo';
 import FlagMenu from '../components/FlagMenu';
@@ -178,8 +178,7 @@ export default function ChatConversationScreen({ navigation, route }) {
     setRecording(false);
     setTranscribing(true);
     try {
-      await releaseRecorder(recorder);
-      const uri = recorder.uri;
+      const { uri } = await finalizeRecording(recorder);
       if (!uri) throw new Error('No recording captured.');
       const b64 = await new File(uri).base64();
       const d = await api.aiTranscribe(b64, Platform.OS === 'web' ? 'audio/webm' : 'audio/mp4', token);

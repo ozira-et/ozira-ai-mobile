@@ -11,7 +11,7 @@ import { useLang } from '../context/LanguageContext';
 import { api } from '../api';
 import { File } from 'expo-file-system';
 import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
-import { ensurePrepared, releaseRecorder } from '../audioSession';
+import { ensurePrepared, finalizeRecording } from '../audioSession';
 import { speakText, stopSpeaking } from '../tts';
 
 const RED = '#B3121B';
@@ -79,8 +79,7 @@ export default function VoiceScreen({ navigation }) {
   async function stopAndProcess() {
     setStatus('thinking'); stopBars();
     try {
-      await releaseRecorder(recorder);
-      const uri = recorder.uri;
+      const { uri } = await finalizeRecording(recorder);
       if (!uri) throw new Error('No audio was captured. Try again.');
       const b64 = await new File(uri).base64();
       const d = await api.aiTranscribe(b64, Platform.OS === 'web' ? 'audio/webm' : 'audio/mp4', token);

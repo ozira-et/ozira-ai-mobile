@@ -1,3 +1,5 @@
+import { File } from 'expo-file-system';
+
 // Shared recorder lifecycle helpers.
 //
 // expo-audio has no release() — only stop() — and calling prepareToRecordAsync
@@ -33,9 +35,30 @@ export async function ensurePrepared(recorder) {
 
 /** Stop a recording/prepared session, ignoring "wasn't recording" errors. */
 export async function releaseRecorder(recorder) {
-  // stop() also finalises the file that callers read from recorder.uri, so it
-  // must run whenever there is a session, not only while actively recording.
-  try {
-    if (recorder && (recorder.isRecording || recorderReady(recorder))) await recorder.stop();
-  } catch (_) {}
+  // ALWAYS attempt stop. stop() is what writes the MPEG-4 index (moov atom);
+  // skip it and the file still contains audio but no decoder can read it —
+  // which looked like "no speech detected" while the upload was hundreds of KB.
+  // Guarding this on isRecording/canRecord was wrong: those can both read false
+  // for a moment while a recording is genuinely in progress. A redundant stop
+  // just throws, which is harmless here; a skipped stop corrupts the recording.
+  try { if (recorder) await recorder.stop(); } catch (_) {}
+}
+
+/**
+ * Stop and wait until the file on disk stops growing, then return its uri.
+ * The native encoder finishes writing slightly after stop() resolves, so
+ * reading immediately can capture a half-written container.
+ */
+export async function finalizeRecording(recorder, { tries = 12, intervalMs = 40 } = {}) {
+  await releaseRecorder(recorder);
+  const uri = recorder && recorder.uri;
+  if (!uri) return { uri: null, size: 0 };
+  let last = -1, size = 0;
+  for (let i = 0; i < tries; i++) {
+    try { const f = new File(uri); size = f.exists ? (f.size || 0) : 0; } catch (_) { size = 0; }
+    if (size > 0 && size === last) break;   // two identical reads: writing has finished
+    last = size;
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  return { uri, size };
 }
