@@ -82,7 +82,7 @@ export default function VoiceScreen({ navigation }) {
       const uri = recorder.uri;
       if (!uri) throw new Error('No audio was captured. Try again.');
       const b64 = await new File(uri).base64();
-      const d = await api.aiTranscribe(b64, 'audio/m4a', token);
+      const d = await api.aiTranscribe(b64, Platform.OS === 'web' ? 'audio/webm' : 'audio/mp4', token);
       const text = (d && d.text || '').trim();
       if (!text) { setError((d && (d.notice || d.error)) || "I didn't catch that. Try again."); setStatus('idle'); return; }
       setUserText(text);

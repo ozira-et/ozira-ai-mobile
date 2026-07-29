@@ -3,7 +3,7 @@
 // reply, then listens again. Every turn is also written into the chat as text.
 // Auto-closes after a stretch of silence.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Modal, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Modal, Animated, Easing, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { fonts } from '../theme';
 import Logo from './Logo';
@@ -27,11 +27,44 @@ const NO_SPEECH_MS = 9000;   // if nothing said this long, count as idle
 const AUTO_CLOSE_MS = 150000; // ~2.5 min of no real exchange -> close
 const HISTORY_TURNS = 6;     // shorter context = faster model response
 
+// Expo's LOW_QUALITY Android preset records 3GP/AMR audio. Addis does not
+// accept that format, so labelling those bytes as M4A made every Addis request
+// fail and unnecessarily triggered the Gemini backup. Keep the smaller bitrate,
+// but record a real MPEG-4/AAC mono file on native devices.
+const SPEECH_RECORDING = {
+  ...RecordingPresets.HIGH_QUALITY,
+  numberOfChannels: 1,
+  bitRate: 64000,
+  isMeteringEnabled: true,
+  android: {
+    ...RecordingPresets.HIGH_QUALITY.android,
+    extension: '.m4a',
+    outputFormat: 'mpeg4',
+    audioEncoder: 'aac',
+  },
+  web: {
+    ...RecordingPresets.HIGH_QUALITY.web,
+    bitsPerSecond: 64000,
+  },
+};
+
+function recordedMimeType(uri) {
+  return Platform.OS === 'web' || /\.webm(?:$|\?)/i.test(String(uri || ''))
+    ? 'audio/webm'
+    : 'audio/mp4';
+}
+
+function friendlySpeechError(value) {
+  const message = String(value || '').trim();
+  if (/quota|rate.?limit|resource_exhausted|limit:\s*0/i.test(message)) {
+    return 'The backup speech service has no available quota. Please try again.';
+  }
+  return message.length > 180 ? message.slice(0, 177) + '…' : message;
+}
+
 export default function VoiceOverlay({ visible, onClose, token, lang = 'en', userName = '', getHistory, onExchange }) {
   const styles = useMemo(() => makeStyles(), []);
-  // LOW_QUALITY on purpose: speech transcribes fine at low bitrate, and the audio
-  // is uploaded as base64 every turn — a smaller file is a much faster round-trip.
-  const recorder = useAudioRecorder({ ...RecordingPresets.LOW_QUALITY, isMeteringEnabled: true });
+  const recorder = useAudioRecorder(SPEECH_RECORDING);
   const [status, setStatus] = useState('idle'); // idle | listening | thinking | speaking
   const [caption, setCaption] = useState('');
   const [error, setError] = useState('');
@@ -146,14 +179,14 @@ export default function VoiceOverlay({ visible, onClose, token, lang = 'en', use
       const uri = recorder.uri;
       if (!uri) return listen();
       const b64 = await new File(uri).base64();
-      const d = await api.aiTranscribe(b64, 'audio/m4a', token);
+      const d = await api.aiTranscribe(b64, recordedMimeType(uri), token);
       setTiming(x => ({ ...x, stt: Date.now() - t0 }));
       const text = (d && d.text || '').trim();
       if (!text) {
         // Show why nothing happened instead of looping in silence: a real error
         // (STT down, not configured) is different from just not hearing speech.
         const why = d && (d.error || d.notice);
-        if (why) setError('Speech recognition: ' + why);
+        if (why) setError('Speech recognition: ' + friendlySpeechError(why));
         if (runningRef.current) return listen();
         return;
       }
@@ -190,7 +223,7 @@ export default function VoiceOverlay({ visible, onClose, token, lang = 'en', use
         if (runningRef.current) listen();
       }
     } catch (e) {
-      setError(currentStage + ': ' + (e.message || 'Voice error'));
+      setError(currentStage + ': ' + friendlySpeechError(e.message || 'Voice error'));
       if (runningRef.current) listen();
     }
   }

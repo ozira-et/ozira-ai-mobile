@@ -181,7 +181,7 @@ export default function ChatConversationScreen({ navigation, route }) {
       const uri = recorder.uri;
       if (!uri) throw new Error('No recording captured.');
       const b64 = await new File(uri).base64();
-      const d = await api.aiTranscribe(b64, 'audio/m4a', token);
+      const d = await api.aiTranscribe(b64, Platform.OS === 'web' ? 'audio/webm' : 'audio/mp4', token);
       if (d.configured === false) Alert.alert('Voice not set up yet', d.notice || 'Add the Gemini key in Railway to enable voice-to-text.');
       else if (d.error) Alert.alert('Could not transcribe', d.error);
       else if (d.text) { setTranscribing(false); send(d.text, true); return; }
@@ -440,6 +440,13 @@ export default function ChatConversationScreen({ navigation, route }) {
     if (!text) return;
     send(text, false, { forceResearch: true });
   }
+  function openAssistantActions(i, m) {
+    Alert.alert('More actions', undefined, [
+      { text: 'Regenerate answer', onPress: () => regenerate(i) },
+      { text: 'Search the web', onPress: () => webSearch(m) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
   async function onSpeak(i, m) {
     // Tapping the speaker of the message that's playing/loading stops it.
     if (speakingIdx === i || speakBusy === i) { stopSpeaking(); setSpeakingIdx(null); setSpeakBusy(null); return; }
@@ -675,48 +682,39 @@ export default function ChatConversationScreen({ navigation, route }) {
               <Text style={[styles.msgTxt, rtlText(rtl), { color: colors.text }]}>{m.content}</Text>
             )}
             {!m.image && !m.pending && m.content ? (
-              <View style={styles.actionRow}>
-                {m.role === 'assistant' && (
-                  <Pressable onPress={() => onSpeak(i, m)} style={styles.actBtn}>
-                    {speakBusy === i ? (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    ) : (
-                      <Ionicons name={speakingIdx === i ? 'stop-circle' : 'volume-high-outline'} size={15} color={speakingIdx === i ? colors.primary : colors.muted} />
-                    )}
-                  </Pressable>
-                )}
-                <Pressable onPress={() => copyMsg(m)} style={styles.actBtn}>
-                  <Ionicons name="copy-outline" size={14} color={colors.muted} />
-                </Pressable>
-                {/* Edit your own message and re-run the answer. */}
-                {m.role === 'user' && !m.thumb && (
-                  <Pressable onPress={() => startEdit(i, m)} style={styles.actBtn}>
-                    <Ionicons name="pencil-outline" size={14} color={editIdx === i ? colors.primary : colors.muted} />
-                  </Pressable>
-                )}
-                {m.role === 'assistant' && (
-                  <Pressable onPress={() => regenerate(i)} style={styles.actBtn}>
-                    <Ionicons name="refresh-outline" size={14} color={colors.muted} />
-                  </Pressable>
-                )}
-                {m.role === 'assistant' && (
+              <View style={[styles.actionRow, m.role === 'assistant' && styles.assistantActionRow]}>
+                {m.role === 'assistant' ? (
                   <>
-                    <Pressable onPress={() => react(i, m, 1)} style={styles.actBtn}>
-                      <Ionicons name={m.reaction === 1 ? 'thumbs-up' : 'thumbs-up-outline'} size={14} color={m.reaction === 1 ? colors.success : colors.muted} />
+                    <Pressable onPress={() => copyMsg(m)} style={styles.actBtn} accessibilityRole="button" accessibilityLabel="Copy answer">
+                      <Ionicons name="copy-outline" size={23} color={colors.muted} />
                     </Pressable>
-                    <Pressable onPress={() => react(i, m, -1)} style={styles.actBtn}>
-                      <Ionicons name={m.reaction === -1 ? 'thumbs-down' : 'thumbs-down-outline'} size={14} color={m.reaction === -1 ? colors.danger : colors.muted} />
+                    <Pressable onPress={() => onSpeak(i, m)} style={styles.actBtn} accessibilityRole="button" accessibilityLabel="Read answer aloud">
+                      {speakBusy === i ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      ) : (
+                        <Ionicons name={speakingIdx === i ? 'stop-circle-outline' : 'volume-high-outline'} size={24} color={speakingIdx === i ? colors.primary : colors.muted} />
+                      )}
+                    </Pressable>
+                    <Pressable onPress={() => react(i, m, -1)} style={styles.actBtn} accessibilityRole="button" accessibilityLabel="Dislike answer">
+                      <Ionicons name={m.reaction === -1 ? 'thumbs-down' : 'thumbs-down-outline'} size={23} color={m.reaction === -1 ? colors.danger : colors.muted} />
+                    </Pressable>
+                    <Pressable onPress={() => shareMsg(m)} style={styles.actBtn} accessibilityRole="button" accessibilityLabel="Share answer">
+                      <Ionicons name="share-outline" size={24} color={colors.muted} />
+                    </Pressable>
+                    <Pressable onPress={() => openAssistantActions(i, m)} style={styles.actBtn} accessibilityRole="button" accessibilityLabel="More answer actions">
+                      <Ionicons name="ellipsis-horizontal" size={25} color={colors.muted} />
                     </Pressable>
                   </>
-                )}
-                {m.role === 'assistant' && (
+                ) : (
                   <>
-                    <Pressable onPress={() => shareMsg(m)} style={styles.actBtn}>
-                      <Ionicons name="share-social-outline" size={14} color={colors.muted} />
+                    <Pressable onPress={() => copyMsg(m)} style={styles.actBtn}>
+                      <Ionicons name="copy-outline" size={18} color={colors.muted} />
                     </Pressable>
-                    <Pressable onPress={() => webSearch(m)} style={styles.actBtn}>
-                      <Ionicons name="globe-outline" size={14} color={colors.muted} />
-                    </Pressable>
+                    {!m.thumb && (
+                      <Pressable onPress={() => startEdit(i, m)} style={styles.actBtn}>
+                        <Ionicons name="pencil-outline" size={18} color={editIdx === i ? colors.primary : colors.muted} />
+                      </Pressable>
+                    )}
                   </>
                 )}
               </View>
@@ -974,9 +972,9 @@ const makeStyles = (colors) => StyleSheet.create({
   modeDropTitle: { color: colors.text, fontFamily: fonts.semibold, fontSize: 13, lineHeight: 18 },
   modeDropSub: { color: colors.muted, fontFamily: fonts.regular, fontSize: 11, lineHeight: 15, marginTop: 2 },
   actionRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 },
-  // These are deliberately separate 36px targets. Previously their hitSlop
-  // regions overlapped, causing Copy taps to sometimes invoke Refresh.
-  actBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
+  assistantActionRow: { gap: 8, marginTop: 10 },
+  // Separate touch targets avoid overlapping actions while keeping the row compact.
+  actBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 9 },
   moreBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.primary + '12', alignItems: 'center', justifyContent: 'center' },
   convMenuBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.26)', alignItems: 'flex-end', paddingRight: 12 },
   convMenu: {
