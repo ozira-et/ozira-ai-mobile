@@ -1,6 +1,18 @@
 import { api } from './api';
+import { setAudioModeAsync } from 'expo-audio';
 
 const RTC_CONFIG = {};
+
+async function routeRealtimeAudioToSpeaker() {
+  try {
+    await setAudioModeAsync({
+      allowsRecording: true,
+      playsInSilentMode: true,
+      shouldRouteThroughEarpiece: false,
+      interruptionMode: 'doNotMix',
+    });
+  } catch (_) {}
+}
 
 function loadWebRtc() {
   try { return require('react-native-webrtc'); }
@@ -17,6 +29,7 @@ function loadWebRtc() {
  * returns only OpenAI's SDP answer.
  */
 export async function createRealtimeVoiceSession({ token, lang, onEvent, signal }) {
+  await routeRealtimeAudioToSpeaker();
   const {
     mediaDevices,
     MediaStream,
@@ -38,6 +51,7 @@ export async function createRealtimeVoiceSession({ token, lang, onEvent, signal 
 
   localStream.getAudioTracks().forEach((track) => pc.addTrack(track, localStream));
   pc.ontrack = (event) => {
+    void routeRealtimeAudioToSpeaker();
     const tracks = event.streams?.[0]?.getTracks?.() || (event.track ? [event.track] : []);
     tracks.forEach((track) => {
       try { remoteStream.addTrack(track); } catch (_) {}
@@ -46,6 +60,7 @@ export async function createRealtimeVoiceSession({ token, lang, onEvent, signal 
     onEvent?.({ type: 'ozira.remote_audio.ready' });
   };
   pc.onconnectionstatechange = () => {
+    if (pc.connectionState === 'connected') void routeRealtimeAudioToSpeaker();
     onEvent?.({ type: 'ozira.connection', state: pc.connectionState });
   };
   pc.oniceconnectionstatechange = () => {
