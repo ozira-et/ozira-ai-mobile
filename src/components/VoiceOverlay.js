@@ -68,6 +68,11 @@ export default function VoiceOverlay({ visible, onClose, token, lang = 'en', use
   const meteringOkRef = useRef(true);
   const runningRef = useRef(false);
   const readyRef = useRef(false);   // mic permission + audio mode done once
+  const sessionRef = useRef(0);     // invalidates async work from an older open/close cycle
+  const preparingRef = useRef(false);
+  const transitionRef = useRef(false);
+  const preparedRef = useRef(false);
+  const releasePromiseRef = useRef(null);
 
   // Globe animation
   const pulse = useRef(new Animated.Value(0)).current;
@@ -91,6 +96,7 @@ export default function VoiceOverlay({ visible, onClose, token, lang = 'en', use
   }, []);
 
   async function start() {
+    const session = ++sessionRef.current;
     setError(''); setCaption('');
     convoRef.current = (getHistory ? getHistory() : []).slice(-HISTORY_TURNS);
     lastExchangeRef.current = Date.now();
@@ -99,27 +105,55 @@ export default function VoiceOverlay({ visible, onClose, token, lang = 'en', use
     // doing it every turn added a visible pause between replies.
     try {
       const perm = await requestRecordingPermissionsAsync();
+      if (session !== sessionRef.current || !runningRef.current) return;
       if (!perm.granted) { setError('Microphone permission is needed.'); setStatus('idle'); return; }
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      if (session !== sessionRef.current || !runningRef.current) return;
       readyRef.current = true;
     } catch (e) { setError(e.message || 'Mic error'); setStatus('idle'); return; }
-    await listen();
+    await listen(session);
   }
 
   function stop() {
+    sessionRef.current += 1;
     runningRef.current = false;
+    transitionRef.current = false;
     clearInterval(pollRef.current); pollRef.current = null;
-    try { recorder.stop(); } catch (_) {}
+    void releaseRecorderSession();
     stopSpeaking();
     setStatus('idle');
   }
 
-  async function listen() {
-    if (!runningRef.current || !readyRef.current) return;
+  async function releaseRecorderSession() {
+    if (releasePromiseRef.current) return releasePromiseRef.current;
+    releasePromiseRef.current = (async () => {
+      try { await recorder.stop(); } catch (_) {}
+      preparedRef.current = false;
+    })();
+    try { await releasePromiseRef.current; }
+    finally { releasePromiseRef.current = null; }
+  }
+
+  async function listen(session = sessionRef.current) {
+    if (session !== sessionRef.current || !runningRef.current || !readyRef.current
+      || preparingRef.current || transitionRef.current || preparedRef.current) return;
+    preparingRef.current = true;
     try {
+      // TTS changes the native audio mode back to playback. Also release any
+      // prepared recorder left behind by a fast refresh or interrupted turn.
+      await releaseRecorderSession();
+      if (session !== sessionRef.current || !runningRef.current) return;
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      if (session !== sessionRef.current || !runningRef.current) return;
       await recorder.prepareToRecordAsync();
+      preparedRef.current = true;
+      if (session !== sessionRef.current || !runningRef.current) {
+        await releaseRecorderSession();
+        return;
+      }
       recorder.record();
     } catch (e) { setError(e.message || 'Mic error'); setStatus('idle'); return; }
+    finally { preparingRef.current = false; }
 
     setStatus('listening');
     turnStartRef.current = Date.now();
@@ -153,15 +187,25 @@ export default function VoiceOverlay({ visible, onClose, token, lang = 'en', use
   }
 
   async function restartListen() {
+    if (transitionRef.current) return;
+    const session = sessionRef.current;
+    transitionRef.current = true;
     // No speech captured this window — quietly start a fresh listening window.
     clearInterval(pollRef.current); pollRef.current = null;
-    try { await recorder.stop(); } catch (_) {}
-    if (runningRef.current) await listen();
+    await releaseRecorderSession();
+    transitionRef.current = false;
+    if (session === sessionRef.current && runningRef.current) await listen(session);
   }
 
   async function endTurn() {
+    if (transitionRef.current || !runningRef.current) return;
+    const session = sessionRef.current;
+    transitionRef.current = true;
     clearInterval(pollRef.current); pollRef.current = null;
-    if (!runningRef.current) return;
+    const resumeListening = async () => {
+      transitionRef.current = false;
+      if (session === sessionRef.current && runningRef.current) await listen(session);
+    };
     // Clear the previous turn only when new speech is being processed. Doing
     // this in listen() would erase a useful failure immediately.
     setError('');
@@ -169,9 +213,13 @@ export default function VoiceOverlay({ visible, onClose, token, lang = 'en', use
     let currentStage = 'Speech recognition';
     try {
       const t0 = Date.now();
-      await recorder.stop();
+      await releaseRecorderSession();
+      if (session !== sessionRef.current || !runningRef.current) {
+        transitionRef.current = false;
+        return;
+      }
       const uri = recorder.uri;
-      if (!uri) return listen();
+      if (!uri) return resumeListening();
       const b64 = await new File(uri).base64();
       const d = await api.aiTranscribe(b64, recordedMimeType(uri), token);
       setTiming(x => ({ ...x, stt: Date.now() - t0 }));
@@ -181,8 +229,7 @@ export default function VoiceOverlay({ visible, onClose, token, lang = 'en', use
         // (STT down, not configured) is different from just not hearing speech.
         const why = d && (d.error || d.notice);
         if (why) setError('Speech recognition: ' + friendlySpeechError(why));
-        if (runningRef.current) return listen();
-        return;
+        return resumeListening();
       }
       setCaption('“' + text + '”');
       setStatus('thinking');
@@ -206,19 +253,22 @@ export default function VoiceOverlay({ visible, onClose, token, lang = 'en', use
       onExchange && onExchange(text, answer);       // write both turns into the chat
       setCaption(answer);
 
-      if (!runningRef.current) return;
+      if (session !== sessionRef.current || !runningRef.current) {
+        transitionRef.current = false;
+        return;
+      }
       setStatus('speaking');
       currentStage = 'Voice playback';
       const t2 = Date.now();
-      const spoken = await speakText(answer, token, () => { if (runningRef.current) listen(); });
+      const spoken = await speakText(answer, token, () => { void resumeListening(); });
       setTiming(x => ({ ...x, tts: Date.now() - t2 }));
       if (!spoken?.ok) {
         setError('Voice playback: ' + (spoken?.message || 'Could not play the spoken reply.'));
-        if (runningRef.current) listen();
+        return resumeListening();
       }
     } catch (e) {
       setError(currentStage + ': ' + friendlySpeechError(e.message || 'Voice error'));
-      if (runningRef.current) listen();
+      return resumeListening();
     }
   }
 
