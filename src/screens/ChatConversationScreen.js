@@ -15,7 +15,8 @@ import { api, absUrl } from '../api';
 import Markdown from '../components/Markdown';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { File } from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
 import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
 import { getCachedConversation, getConversation, saveConversation, deleteConversation, setConversationMeta, setConversationFolder, listFolders, newId, getProfile } from '../localStore';
 import Logo from '../components/Logo';
@@ -117,6 +118,8 @@ export default function ChatConversationScreen({ navigation, route }) {
   const [speakingIdx, setSpeakingIdx] = useState(null);// index currently playing
   const [voiceOpen, setVoiceOpen] = useState(false);   // live voice overlay
   const [editIdx, setEditIdx] = useState(null);         // index of message being edited
+  const [viewerImage, setViewerImage] = useState(null); // full-screen generated image
+  const [savingImage, setSavingImage] = useState(false);
 
   useEffect(() => { getProfile().then(p => { instrRef.current = p.customInstructions || ''; }).catch(() => {}); }, []);
   useEffect(() => () => stopSpeaking(), []);
@@ -292,6 +295,31 @@ export default function ChatConversationScreen({ navigation, route }) {
   }
   async function shareMsg(m) {
     try { await Share.share({ message: typeof m.content === 'string' ? m.content : '' }); } catch (_) {}
+  }
+  async function shareGeneratedImage(uri) {
+    if (!uri) return;
+    try { await Share.share({ message: uri, url: uri, title: 'OZIRA AI image' }); } catch (_) {}
+  }
+  async function saveGeneratedImage(uri) {
+    if (!uri || savingImage) return;
+    setSavingImage(true);
+    try {
+      const permission = await MediaLibrary.requestPermissionsAsync(true, ['photo']);
+      if (!permission.granted) {
+        Alert.alert('Photo permission needed', 'Allow OZIRA AI to save images in your phone settings.');
+        return;
+      }
+      const clean = uri.split('?')[0].toLowerCase();
+      const ext = clean.endsWith('.webp') ? 'webp' : (clean.endsWith('.jpg') || clean.endsWith('.jpeg')) ? 'jpg' : 'png';
+      const destination = new File(Paths.cache, `ozira-image-${Date.now()}.${ext}`);
+      const downloaded = await File.downloadFileAsync(uri, destination, { idempotent: true });
+      await MediaLibrary.saveToLibraryAsync(downloaded.uri);
+      notify(t('notifSaved'), '', 'success');
+    } catch (e) {
+      Alert.alert('Could not save image', e.message || 'Please try again.');
+    } finally {
+      setSavingImage(false);
+    }
   }
   // Like / dislike. A rating that vanishes is worthless, so we do three things:
   // store it on the message (survives reload), report it to the backend, and —
@@ -543,7 +571,9 @@ export default function ChatConversationScreen({ navigation, route }) {
             {m.role === 'assistant' && !m.pending && <Text style={styles.who}>{m.image ? 'Image' : 'OZIRA'}</Text>}
             {m.thumb ? <Image source={{ uri: m.thumb }} style={styles.thumb} /> : null}
             {m.image ? (
-              <Image source={{ uri: m.image }} style={styles.image} resizeMode="cover" />
+              <Pressable onPress={() => setViewerImage(m.image)} accessibilityRole="button" accessibilityLabel="Open generated image">
+                <Image source={{ uri: m.image }} style={styles.image} resizeMode="cover" />
+              </Pressable>
             ) : m.pending ? (
               <View style={styles.thinkingRow} accessibilityLabel={t('vThinking')}>
                 <Text style={styles.thinkingTxt}>{t('vThinking').replace('…', '')}</Text>
@@ -723,6 +753,31 @@ export default function ChatConversationScreen({ navigation, route }) {
         </Pressable>
       </Modal>
 
+      <Modal visible={!!viewerImage} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setViewerImage(null)}>
+        <View style={styles.imageViewer}>
+          <View style={[styles.imageViewerTop, { paddingTop: insets.top + 8 }]}>
+            <Pressable style={styles.viewerIconBtn} onPress={() => setViewerImage(null)} accessibilityRole="button" accessibilityLabel="Close image">
+              <Ionicons name="close" size={25} color="#FFFFFF" />
+            </Pressable>
+            <Text style={styles.imageViewerTitle}>{t('notifImageReady')}</Text>
+            <View style={styles.viewerTopActions}>
+              <Pressable style={styles.viewerIconBtn} onPress={() => shareGeneratedImage(viewerImage)} accessibilityRole="button" accessibilityLabel="Share image">
+                <Ionicons name="share-outline" size={22} color="#FFFFFF" />
+              </Pressable>
+              <Pressable style={styles.viewerSaveBtn} onPress={() => saveGeneratedImage(viewerImage)} disabled={savingImage} accessibilityRole="button" accessibilityLabel="Save image">
+                {savingImage
+                  ? <ActivityIndicator size="small" color="#FFFFFF" />
+                  : <Ionicons name="download-outline" size={20} color="#FFFFFF" />}
+                {!savingImage && <Text style={styles.viewerSaveTxt}>{t('notifSaved')}</Text>}
+              </Pressable>
+            </View>
+          </View>
+          <Pressable style={styles.imageViewerBody} onPress={() => setViewerImage(null)}>
+            {!!viewerImage && <Image source={{ uri: viewerImage }} style={styles.imageViewerImage} resizeMode="contain" />}
+          </Pressable>
+        </View>
+      </Modal>
+
       {/* Attachment sheet — a plain in-tree overlay, NOT a <Modal>. This screen
           already stacks several Modals; on Android extra ones can fail to show
           or swallow taps, and a native picker can't launch while one dismisses. */}
@@ -842,6 +897,27 @@ const makeStyles = (colors) => StyleSheet.create({
   speakBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8, alignSelf: 'flex-start' },
   speakTxt: { color: colors.muted, fontFamily: fonts.medium, fontSize: 12 },
   image: { width: 240, height: 240, borderRadius: 12 },
+  imageViewer: { flex: 1, backgroundColor: '#050507' },
+  imageViewerTop: {
+    minHeight: 68, paddingHorizontal: 14, paddingBottom: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: 'rgba(5,5,7,0.96)', borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.13)',
+  },
+  imageViewerTitle: { flex: 1, color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 15 },
+  viewerTopActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  viewerIconBtn: {
+    width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.10)',
+  },
+  viewerSaveBtn: {
+    minWidth: 86, height: 42, paddingHorizontal: 13, borderRadius: 21,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7,
+    backgroundColor: colors.primary,
+  },
+  viewerSaveTxt: { color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 13 },
+  imageViewerBody: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 10 },
+  imageViewerImage: { width: '100%', height: '100%' },
   composer: {
     paddingHorizontal: 12, paddingTop: 8, backgroundColor: colors.bg,
     borderTopWidth: 1, borderTopColor: colors.border,

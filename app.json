@@ -18,7 +18,17 @@
       "package": "com.ozira.ai"
     },
     "plugins": [
-      "expo-audio"
+      "expo-audio",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow OZIRA AI to access your photos.",
+          "savePhotosPermission": "Allow OZIRA AI to save generated images.",
+          "granularPermissions": [
+            "photo"
+          ]
+        }
+      ]
     ]
   }
 }
