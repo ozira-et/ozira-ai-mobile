@@ -77,6 +77,15 @@ function isImageRequest(value) {
   return visual.test(text) && intent.test(text);
 }
 
+function imageFromDataUrl(value) {
+  const match = String(value || '').match(/^data:(image\/(?:png|jpeg|jpg|webp|gif));base64,(.+)$/s);
+  if (!match) return null;
+  return {
+    mimeType: match[1] === 'image/jpg' ? 'image/jpeg' : match[1],
+    base64: match[2],
+  };
+}
+
 export default function ChatConversationScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
   const colors = useColors();
@@ -183,11 +192,20 @@ export default function ChatConversationScreen({ navigation, route }) {
     try {
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) return Alert.alert('Permission needed', 'Allow photo access to attach a picture.');
-      const r = await ImagePicker.launchImageLibraryAsync({ base64: true, quality: 0.6 });
+      const r = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        base64: true,
+        quality: 0.9,
+        preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+      });
       if (r.canceled || !r.assets || !r.assets.length) return;
       const a = r.assets[0];
+      if (!a.base64) throw new Error('The selected image could not be read.');
       setImageMode(false); setResearch(false);
-      setAttachment({ kind: 'photo', name: 'photo.jpg', base64: a.base64, mimeType: a.mimeType || 'image/jpeg' });
+      // Expo documents the picker Base64 field as JPEG data. Label the bytes
+      // correctly even when the source asset was PNG, HEIC, AVIF, WebP, or GIF.
+      setAttachment({ kind: 'photo', name: 'photo.jpg', base64: a.base64, mimeType: 'image/jpeg' });
     } catch (e) { Alert.alert('Photo', e.message || 'Could not open the photo library.'); }
   }
 
@@ -195,11 +213,17 @@ export default function ChatConversationScreen({ navigation, route }) {
     try {
       const perm = await ImagePicker.requestCameraPermissionsAsync();
       if (!perm.granted) return Alert.alert('Permission needed', 'Allow camera access to take a photo.');
-      const r = await ImagePicker.launchCameraAsync({ base64: true, quality: 0.6 });
+      const r = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        base64: true,
+        quality: 0.9,
+      });
       if (r.canceled || !r.assets || !r.assets.length) return;
       const a = r.assets[0];
+      if (!a.base64) throw new Error('The captured image could not be read.');
       setImageMode(false); setResearch(false);
-      setAttachment({ kind: 'photo', name: 'photo.jpg', base64: a.base64, mimeType: a.mimeType || 'image/jpeg' });
+      setAttachment({ kind: 'photo', name: 'photo.jpg', base64: a.base64, mimeType: 'image/jpeg' });
     } catch (e) { Alert.alert('Camera', e.message || 'Could not open the camera.'); }
   }
 
@@ -308,7 +332,9 @@ export default function ChatConversationScreen({ navigation, route }) {
     setImageSaved(false);
     try {
       const clean = uri.split('?')[0].toLowerCase();
-      const ext = clean.endsWith('.webp') ? 'webp' : (clean.endsWith('.jpg') || clean.endsWith('.jpeg')) ? 'jpg' : 'png';
+      const ext = clean.endsWith('.webp') ? 'webp'
+        : clean.endsWith('.gif') ? 'gif'
+          : (clean.endsWith('.jpg') || clean.endsWith('.jpeg')) ? 'jpg' : 'png';
       const destination = new File(Paths.cache, `ozira-image-${Date.now()}.${ext}`);
       const downloaded = await File.downloadFileAsync(uri, destination, { idempotent: true });
       // Saving an app-created file does not require broad photo-library read
@@ -430,6 +456,11 @@ export default function ChatConversationScreen({ navigation, route }) {
       // different device. This prevents a follow-up prompt from being sent to
       // the text model as ordinary chat.
       const wantImage = (imageMode || isImageRequest(text)) && !useResearch;
+      // Keep the most recently uploaded image available for follow-up questions,
+      // including after this conversation is reopened on another device.
+      const visionImage = att && att.kind === 'photo'
+        ? { base64: att.base64, mimeType: att.mimeType }
+        : imageFromDataUrl([...next].reverse().find(m => m.role === 'user' && m.thumb)?.thumb);
       if (wantImage) {
         if (!imageMode) setImageMode(true);
         const source = [...next].reverse().find(m => m.role === 'assistant' && m.image);
@@ -452,9 +483,9 @@ export default function ChatConversationScreen({ navigation, route }) {
           const spoken = await speakText(body, token);
           if (!spoken?.ok) notify(t('notifFailed'), spoken?.error || 'Voice playback could not start.', 'warn');
         }
-      } else if (att && att.kind === 'photo') {
+      } else if (visionImage) {
         const history = next.map((m, i) => ({ role: m.role, content: i === next.length - 1 ? (text || 'What is in this image?') : (typeof m.content === 'string' ? m.content : '') }));
-        const d = await api.aiChat({ tier: mode, skill, messages: history, images: [{ base64: att.base64, mimeType: att.mimeType }], lang }, token, signal);
+        const d = await api.aiVision({ tier: mode, effort, skill, messages: history, images: [visionImage], lang }, token, signal);
         setMessages([...next, { role: 'assistant', content: d.reply || d.error || 'No reply.', model: d.modelLabel || 'Vision' }]);
       } else {
         let lastContent = text;

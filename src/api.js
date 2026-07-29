@@ -80,6 +80,7 @@ export const api = {
   // --- new AI endpoints (need the backend patch deployed) ---
   aiCapabilities: (token) => req('/api/ai/capabilities', { token }),
   aiChat: (payload, token, signal) => req('/api/ai/chat', { body: payload, token, signal }),
+  aiVision: (payload, token, signal) => req('/api/ai/vision', { body: payload, token, signal }),
   aiResearch: (query, token, signal) => req('/api/ai/research', { body: { query }, token, signal }),
   aiTranscribe: (audio, mimeType, token) => req('/api/ai/transcribe', { body: { audio, mimeType, lang: currentLang }, token }),
   aiSpeak: (text, token, voice) => req('/api/ai/speak', { body: { text, voice, lang: currentLang }, token }),
