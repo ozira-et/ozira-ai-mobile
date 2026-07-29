@@ -46,7 +46,7 @@ async function req(path, { method, body, token, signal } = {}) {
 async function realtimeSdp(sdp, lang, token, signal) {
   const sessionDeviceId = await getDeviceId();
   const res = await fetch(
-    config.API_BASE + '/api/ai/realtime?lang=' + encodeURIComponent(lang || currentLang || 'en'),
+    config.API_BASE + '/api/ai/realtime?ground=1&lang=' + encodeURIComponent(lang || currentLang || 'en'),
     {
       method: 'POST',
       headers: {

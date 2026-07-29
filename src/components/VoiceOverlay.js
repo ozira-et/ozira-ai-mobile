@@ -13,6 +13,7 @@ const RED = '#B3121B';
 const ON = '#FFFFFF';
 const DIM = 'rgba(255,255,255,0.8)';
 const HISTORY_TURNS = 8;
+const TRANSCRIPT_GROUNDED_LANGUAGES = new Set(['am', 'om', 'ti', 'ha']);
 
 function errorMessage(event) {
   const value = event?.error?.message || event?.message || 'Realtime voice failed.';
@@ -58,6 +59,7 @@ export default function VoiceOverlay({
   const userTextRef = useRef('');
   const answerTextRef = useRef('');
   const exchangeSavedRef = useRef(false);
+  const responseRequestedRef = useRef(false);
   const flushTimerRef = useRef(null);
 
   const pulse = useRef(new Animated.Value(0)).current;
@@ -89,6 +91,7 @@ export default function VoiceOverlay({
     userTextRef.current = '';
     answerTextRef.current = '';
     exchangeSavedRef.current = false;
+    responseRequestedRef.current = false;
     clearTimeout(flushTimerRef.current);
     flushTimerRef.current = null;
   }
@@ -211,10 +214,22 @@ export default function VoiceOverlay({
         if (text) {
           userTextRef.current = text;
           setCaption('“' + text + '”');
+          if (TRANSCRIPT_GROUNDED_LANGUAGES.has(lang) && !responseRequestedRef.current) {
+            responseRequestedRef.current = true;
+            setStatus('thinking');
+            sessionRef.current?.respondToTranscript?.(event.item_id, text);
+          }
           maybeSaveExchange();
         }
         break;
       }
+      case 'conversation.item.input_audio_transcription.failed':
+        if (TRANSCRIPT_GROUNDED_LANGUAGES.has(lang) && !responseRequestedRef.current) {
+          responseRequestedRef.current = true;
+          setStatus('thinking');
+          sessionRef.current?.respondToLatestAudio?.();
+        }
+        break;
       case 'response.created':
         setStatus('thinking');
         break;

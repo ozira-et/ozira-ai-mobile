@@ -129,5 +129,32 @@ export async function createRealtimeVoiceSession({ token, lang, onEvent, signal 
         },
       }));
     },
+    respondToTranscript(itemId, transcript) {
+      const text = String(transcript || '').trim();
+      if (!text || dataChannel.readyState !== 'open') return false;
+      // Replace the audio item with the completed text before inference so the
+      // visible question and the answered question cannot drift apart.
+      if (itemId) {
+        dataChannel.send(JSON.stringify({
+          type: 'conversation.item.delete',
+          item_id: itemId,
+        }));
+      }
+      dataChannel.send(JSON.stringify({
+        type: 'conversation.item.create',
+        item: {
+          type: 'message',
+          role: 'user',
+          content: [{ type: 'input_text', text }],
+        },
+      }));
+      dataChannel.send(JSON.stringify({ type: 'response.create' }));
+      return true;
+    },
+    respondToLatestAudio() {
+      if (dataChannel.readyState !== 'open') return false;
+      dataChannel.send(JSON.stringify({ type: 'response.create' }));
+      return true;
+    },
   };
 }
