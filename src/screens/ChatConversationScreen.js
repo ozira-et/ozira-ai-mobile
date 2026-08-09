@@ -17,7 +17,8 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
-import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
+import { useAudioPlayer, useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
+import {useVideoPlayer, VideoView} from 'expo-video';
 import { ensurePrepared, finalizeRecording } from '../audioSession';
 import { getCachedConversation, getConversation, saveConversation, deleteConversation, setConversationMeta, setConversationFolder, listFolders, newId, getProfile } from '../localStore';
 import Logo from '../components/Logo';
@@ -33,6 +34,53 @@ const RESPONSE_LEVEL_IDS = [
   { id: 'balanced', icon: 'remove' },
   { id: 'deep', icon: 'sparkles' },
 ];
+
+function MediaVideo({uri, token, compact = false}) {
+  const source = /^https?:/i.test(String(uri || '')) ? {uri, headers: token ? {Authorization: 'Bearer ' + token} : {}} : uri;
+  const player = useVideoPlayer(source, (instance) => { instance.loop = false; });
+  return <VideoView player={player} style={compact ? stylesForMedia.compactVideo : stylesForMedia.video} nativeControls contentFit="contain" />;
+}
+
+function MediaAudio({uri, token}) {
+  const source = /^https?:/i.test(String(uri || '')) ? {uri, headers: token ? {Authorization: 'Bearer ' + token} : {}} : uri;
+  const player = useAudioPlayer(source);
+  const [playing, setPlaying] = useState(false);
+  return (
+    <Pressable style={stylesForMedia.audio} onPress={() => { if (playing) player.pause(); else player.play(); setPlaying(!playing); }} accessibilityRole="button" accessibilityLabel={playing ? 'Pause audio' : 'Play audio'}>
+      <Ionicons name={playing ? 'pause' : 'play'} size={20} color="#FFFFFF" />
+      <Text style={stylesForMedia.audioText}>{playing ? 'Pause audio' : 'Play audio'}</Text>
+    </Pressable>
+  );
+}
+
+function VideoJobCard({job, token, onCancel, onRetry, t}) {
+  if (job.status === 'completed' && job.url) return <MediaVideo uri={absUrl(job.url)} token={token} />;
+  return (
+    <View style={stylesForMedia.job}>
+      <View style={stylesForMedia.jobHeader}><Ionicons name="videocam" size={20} color="#FFFFFF" /><Text style={stylesForMedia.jobTitle}>{t('geminiVideo')}</Text></View>
+      <View style={stylesForMedia.track}><View style={[stylesForMedia.fill, {width: `${Math.max(3, Math.min(100, job.progress || 0))}%`}]} /></View>
+      <Text style={stylesForMedia.jobText}>{job.status === 'failed' ? (job.error || t('videoFailed')) : job.status === 'cancelled' ? t('videoCancelled') : `${job.progress || 0}% · ${t('videoGenerating')}`}</Text>
+      <View style={stylesForMedia.jobActions}>
+        {job.status === 'processing' && <Pressable onPress={onCancel} style={stylesForMedia.jobButton}><Text style={stylesForMedia.jobButtonText}>{t('cancel')}</Text></Pressable>}
+        {['failed', 'cancelled'].includes(job.status) && <Pressable onPress={onRetry} style={stylesForMedia.jobButton}><Text style={stylesForMedia.jobButtonText}>{t('retry')}</Text></Pressable>}
+      </View>
+    </View>
+  );
+}
+
+const stylesForMedia = StyleSheet.create({
+  video: {width: 280, height: 190, borderRadius: 14, backgroundColor: '#08080D'},
+  compactVideo: {width: 220, height: 140, borderRadius: 12, backgroundColor: '#08080D'},
+  audio: {minWidth: 190, flexDirection: 'row', gap: 10, alignItems: 'center', padding: 14, borderRadius: 14, backgroundColor: '#272735'},
+  audioText: {color: '#FFFFFF', fontFamily: fonts.medium, fontSize: 13},
+  job: {width: 280, padding: 14, borderRadius: 14, backgroundColor: '#171721', gap: 10},
+  jobHeader: {flexDirection: 'row', gap: 8, alignItems: 'center'}, jobTitle: {color: '#FFFFFF', fontFamily: fonts.semibold, fontSize: 14},
+  track: {height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: '#3A3A48'}, fill: {height: 6, backgroundColor: '#B3121B'},
+  jobText: {color: '#C9C9D1', fontFamily: fonts.regular, fontSize: 12}, jobActions: {flexDirection: 'row'},
+  jobButton: {paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: '#FFFFFF55'}, jobButtonText: {color: '#FFFFFF', fontFamily: fonts.medium, fontSize: 12},
+  file: {minWidth: 190, flexDirection: 'row', gap: 9, alignItems: 'center', padding: 12, borderRadius: 12, backgroundColor: '#272735'},
+  fileText: {color: '#FFFFFF', fontFamily: fonts.medium, fontSize: 13, flexShrink: 1},
+});
 
 function ThinkingDots() {
   const values = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]).current;
@@ -61,12 +109,15 @@ const SUGGESTIONS = [
 ];
 
 const MENU = [
-  { key: 'photo', label: 'Photo', sub: 'Send a picture to the AI', icon: 'image' },
-  { key: 'camera', label: 'Camera', sub: 'Take a photo now', icon: 'camera' },
-  { key: 'file', label: 'File', sub: 'PDF, text or document', icon: 'document-text' },
-  { key: 'image', label: 'Create image', sub: 'Generate a picture with AI', icon: 'color-palette' },
-  { key: 'research', label: 'Research', sub: 'Search the web to answer', icon: 'globe' },
-  { key: 'connector', label: 'Connectors', sub: 'Link Telegram, Drive, Gmail…', icon: 'git-network' },
+  { key: 'photo', labelKey: 'attachPhoto', subKey: 'attachPhotoSub', icon: 'image' },
+  { key: 'camera', labelKey: 'attachCamera', subKey: 'attachCameraSub', icon: 'camera' },
+  { key: 'video', labelKey: 'attachVideo', subKey: 'attachVideoSub', icon: 'film' },
+  { key: 'videoCamera', labelKey: 'recordVideo', subKey: 'recordVideoSub', icon: 'videocam' },
+  { key: 'file', labelKey: 'attachFile', subKey: 'attachFileSub', icon: 'document-text' },
+  { key: 'image', labelKey: 'createImage', subKey: 'createImageSub', icon: 'color-palette' },
+  { key: 'createVideo', labelKey: 'createVideo', subKey: 'createVideoSub', icon: 'sparkles' },
+  { key: 'research', labelKey: 'research', subKey: 'researchSub', icon: 'globe' },
+  { key: 'connector', labelKey: 'connectors', subKey: 'connectorsSub', icon: 'git-network' },
 ];
 
 // Users should not have to know they must first enable image mode. Recognize a
@@ -77,6 +128,11 @@ function isImageRequest(value) {
   const visual = /\b(image|picture|photo|photograph|logo|drawing|artwork|illustration|poster|wallpaper|portrait|icon|banner|flag|sticker|meme)\b|(?:ምስል|ስዕል|ፎቶ|ሥዕል)/i;
   const intent = /\b(generate|create|make|design|produce|draw|paint|sketch|illustrate|render|show|give|want|need)\b|(?:ፍጠር|ስራ|አውጣ|ሳል|ንደፍ)/i;
   return visual.test(text) && intent.test(text);
+}
+
+function isVideoRequest(value) {
+  const text = String(value || '').trim();
+  return /\b(generate|create|make|render|produce)\b/i.test(text) && /\b(video|clip|animation|movie)\b/i.test(text);
 }
 
 function imageFromDataUrl(value) {
@@ -108,6 +164,7 @@ export default function ChatConversationScreen({ navigation, route }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [imageMode, setImageMode] = useState(!!route.params?.imageMode);
+  const [videoMode, setVideoMode] = useState(false);
   const [mode, setMode] = useState('fast'); // 'fast' | 'smart'
   const [effort, setEffort] = useState('quick'); // Instant | Medium | High
   const [menuOpen, setMenuOpen] = useState(false);
@@ -118,6 +175,7 @@ export default function ChatConversationScreen({ navigation, route }) {
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const abortRef = useRef(null);
+  const videoPollsRef = useRef(new Map());
   const [convId, setConvId] = useState(route.params?.conversationId || newId());
   const dirtyRef = useRef(false);
   const instrRef = useRef('');
@@ -144,6 +202,8 @@ export default function ChatConversationScreen({ navigation, route }) {
   useEffect(() => () => {
     stopSpeaking();
     if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+    videoPollsRef.current.forEach(controller => controller.abort());
+    videoPollsRef.current.clear();
   }, []);
   useEffect(() => { setImageSaved(false); }, [viewerImage]);
   useEffect(() => {
@@ -206,14 +266,36 @@ export default function ChatConversationScreen({ navigation, route }) {
     setMenuOpen(false);
     // Mode toggles are pure state — safe to run immediately.
     if (key === 'image') { setImageMode(true); setResearch(false); return; }
+    if (key === 'createVideo') { setVideoMode(true); setImageMode(false); setResearch(false); return; }
     if (key === 'research') { setResearch(r => !r); setImageMode(false); return; }
     // Let the sheet unmount first, then open the native picker/screen.
     setTimeout(() => {
       if (key === 'photo') pickPhoto();
       else if (key === 'camera') takePhoto();
+      else if (key === 'video') pickVideo(false);
+      else if (key === 'videoCamera') pickVideo(true);
       else if (key === 'file') pickFile();
       else if (key === 'connector') navigation.navigate('Connectors');
     }, 80);
+  }
+
+  async function pickVideo(camera) {
+    try {
+      const permission = camera
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) return Alert.alert('Permission needed', camera ? 'Allow camera access to record a video.' : 'Allow media access to attach a video.');
+      const result = camera
+        ? await ImagePicker.launchCameraAsync({mediaTypes: ['videos'], videoMaxDuration: 60, videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium})
+        : await ImagePicker.launchImageLibraryAsync({mediaTypes: ['videos'], allowsEditing: false});
+      if (result.canceled || !result.assets?.length) return;
+      const asset = result.assets[0];
+      const mimeType = asset.mimeType || (/\.webm$/i.test(asset.fileName || asset.uri) ? 'video/webm' : /\.mov$/i.test(asset.fileName || asset.uri) ? 'video/quicktime' : 'video/mp4');
+      if (asset.fileSize && asset.fileSize > 50 * 1024 * 1024) throw new Error('Choose a video under 50 MiB.');
+      const uploaded = await api.aiUpload(asset.file || asset.uri, mimeType, asset.fileName || 'video', token);
+      setImageMode(false); setVideoMode(false); setResearch(false);
+      setAttachment({kind: 'video', name: uploaded.name, mimeType: uploaded.mimeType, uploadId: uploaded.uploadId, previewUri: asset.uri, size: uploaded.size});
+    } catch (e) { Alert.alert('Video', e.message || 'Could not attach the video.'); }
   }
 
   async function pickPhoto() {
@@ -230,6 +312,7 @@ export default function ChatConversationScreen({ navigation, route }) {
       if (r.canceled || !r.assets || !r.assets.length) return;
       const a = r.assets[0];
       if (!a.base64) throw new Error('The selected image could not be read.');
+      if (a.fileSize && a.fileSize > 8 * 1024 * 1024) throw new Error('Choose an image under 8 MiB.');
       setImageMode(false); setResearch(false);
       // Expo documents the picker Base64 field as JPEG data. Label the bytes
       // correctly even when the source asset was PNG, HEIC, AVIF, WebP, or GIF.
@@ -250,6 +333,7 @@ export default function ChatConversationScreen({ navigation, route }) {
       if (r.canceled || !r.assets || !r.assets.length) return;
       const a = r.assets[0];
       if (!a.base64) throw new Error('The captured image could not be read.');
+      if (a.fileSize && a.fileSize > 8 * 1024 * 1024) throw new Error('Capture an image under 8 MiB.');
       setImageMode(false); setResearch(false);
       setAttachment({ kind: 'photo', name: 'photo.jpg', base64: a.base64, mimeType: 'image/jpeg' });
     } catch (e) { Alert.alert('Camera', e.message || 'Could not open the camera.'); }
@@ -260,11 +344,19 @@ export default function ChatConversationScreen({ navigation, route }) {
       const r = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
       if (r.canceled || !r.assets || !r.assets.length) return;
       const a = r.assets[0];
+      const mimeType = String(a.mimeType || 'text/plain').toLowerCase();
+      const kind = mimeType.startsWith('audio/') ? 'audio' : mimeType.startsWith('video/') ? 'video' : mimeType.startsWith('image/') ? 'photo' : 'file';
       let textContent = '';
-      try { textContent = await new File(a.uri).text(); } catch (_) {}
+      if (mimeType === 'text/plain' && (!a.size || a.size < 1024 * 1024)) {
+        try { textContent = await new File(a.uri).text(); } catch (_) {}
+      }
       setImageMode(false); setResearch(false);
-      setAttachment({ kind: 'file', name: a.name || 'file', text: textContent, mimeType: a.mimeType || 'text/plain' });
-      if (!textContent) Alert.alert('Heads up', 'Text files work now. PDFs need the server reader (coming soon), so this one may not be understood yet.');
+      if (textContent) setAttachment({kind: 'file', name: a.name || 'file', text: textContent, mimeType});
+      else {
+        if (a.size && a.size > 50 * 1024 * 1024) throw new Error('Choose a file under 50 MiB.');
+        const uploaded = await api.aiUpload(a.file || a.uri, mimeType, a.name || 'file', token);
+        setAttachment({kind, name: uploaded.name, mimeType: uploaded.mimeType, uploadId: uploaded.uploadId, previewUri: a.uri, size: uploaded.size});
+      }
     } catch (e) { Alert.alert('Error', e.message); }
   }
 
@@ -281,6 +373,8 @@ export default function ChatConversationScreen({ navigation, route }) {
         // Web stores server-relative image URLs; React Native needs an absolute
         // URL to show the saved image in the same conversation.
         ...(m.image ? { image: absUrl(m.image) } : {}),
+        ...(m.video && /^\//.test(m.video) ? {video: absUrl(m.video)} : {}),
+        ...(m.videoJob?.url && /^\//.test(m.videoJob.url) ? {videoJob: {...m.videoJob, url: absUrl(m.videoJob.url)}} : {}),
       })) : [];
       setMessages(restored);
       setImageMode(!!route.params?.imageMode || restored.some(m => m.image));
@@ -488,11 +582,51 @@ export default function ChatConversationScreen({ navigation, route }) {
     saveConversation({
       id: convId,
       title,
-      messages: messages.map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content : '', image: m.image || null, imageId: m.imageId || null, thumb: m.thumb || null, model: m.model || null, reaction: m.reaction || 0 })),
+      messages: messages.map(m => ({
+        role: m.role, content: typeof m.content === 'string' ? m.content : '',
+        image: m.image || null, imageId: m.imageId || null, thumb: m.thumb || null,
+        video: m.video || null, audio: m.audio || null, videoJob: m.videoJob || null,
+        fileName: m.fileName || null, model: m.model || null, reaction: m.reaction || 0,
+      })),
     });
   }, [messages]);
 
   function scrollDown() { requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true })); }
+
+  function updateVideoJob(jobId, patch) {
+    dirtyRef.current = true;
+    setMessages(current => current.map(message => message.videoJob?.jobId === jobId
+      ? {...message, videoJob: {...message.videoJob, ...patch}}
+      : message));
+  }
+
+  function cancelVideoPoll(jobId) {
+    videoPollsRef.current.get(jobId)?.abort();
+    videoPollsRef.current.delete(jobId);
+    updateVideoJob(jobId, {status: 'cancelled'});
+  }
+
+  async function pollVideoJob(jobId) {
+    const controller = new AbortController();
+    videoPollsRef.current.set(jobId, controller);
+    try {
+      while (!controller.signal.aborted) {
+        await new Promise(resolve => setTimeout(resolve, 3500));
+        if (controller.signal.aborted) break;
+        const job = await api.aiVideoJob(jobId, token, controller.signal);
+        updateVideoJob(jobId, job);
+        if (job.status === 'completed') {
+          videoPollsRef.current.delete(jobId);
+          notify('Video ready', 'Your Gemini video is ready to play.', 'success');
+          break;
+        }
+        if (job.status === 'failed') { videoPollsRef.current.delete(jobId); break; }
+      }
+    } catch (error) {
+      if (error.name !== 'AbortError') updateVideoJob(jobId, {status: 'failed', error: error.message});
+      videoPollsRef.current.delete(jobId);
+    }
+  }
 
   async function send(overrideText, fromVoice, opts = {}) {
     const text = (typeof overrideText === 'string' ? overrideText : input).trim();
@@ -509,7 +643,12 @@ export default function ChatConversationScreen({ navigation, route }) {
     const cut = opts.replaceFrom != null ? opts.replaceFrom : editIdx;
     const base = cut != null ? messages.slice(0, cut) : messages;
     if (editIdx != null) setEditIdx(null);
-    const next = [...base, { role: 'user', content: shown, thumb }];
+    const next = [...base, {
+      role: 'user', content: shown, thumb,
+      ...(att?.kind === 'video' && att.previewUri ? {video: att.previewUri} : {}),
+      ...(att?.kind === 'audio' && att.previewUri ? {audio: att.previewUri} : {}),
+      ...(att?.kind === 'file' ? {fileName: att.name} : {}),
+    }];
     setMessages([...next, { role: 'assistant', content: '...', pending: true }]);
     scrollDown();
     setBusy(true);
@@ -521,24 +660,35 @@ export default function ChatConversationScreen({ navigation, route }) {
       // A generated-image thread remains in this flow after reopening it on a
       // different device. This prevents a follow-up prompt from being sent to
       // the text model as ordinary chat.
-      const wantImage = (imageMode || isImageRequest(text)) && !useResearch;
+      const wantImage = (imageMode || isImageRequest(text)) && !useResearch && (!att || att.kind === 'photo');
+      const wantVideo = (opts.forceVideo || videoMode || isVideoRequest(text)) && !useResearch && !att;
       // Keep the most recently uploaded image available for follow-up questions,
       // including after this conversation is reopened on another device.
       const visionImage = att && att.kind === 'photo'
         ? { base64: att.base64, mimeType: att.mimeType }
         : imageFromDataUrl([...next].reverse().find(m => m.role === 'user' && m.thumb)?.thumb);
-      if (wantImage) {
+      if (wantVideo) {
+        setVideoMode(true);
+        const started = await api.aiVideo({prompt: text, aspectRatio: '16:9', durationSeconds: 8}, token, signal);
+        const job = {jobId: started.jobId, status: started.status, progress: started.progress || 0, model: started.model, prompt: text};
+        setMessages([...next, {role: 'assistant', content: '', videoJob: job, model: started.model}]);
+        void pollVideoJob(started.jobId);
+      } else if (wantImage) {
         if (!imageMode) setImageMode(true);
         const previous = [...next].reverse().find(m => m.role === 'assistant' && m.image);
-        const source = editSource || (previous ? { url: previous.image, id: previous.imageId } : null);
+        const source = att?.kind === 'photo'
+          ? {image: att.base64, mimeType: att.mimeType}
+          : (editSource || (previous ? { url: previous.image, id: previous.imageId } : null));
         const d = source
-          ? await api.imageEdit({
+          ? await api.aiImageEdit({
               prompt: text,
               sourceUrl: source.url,
+              image: source.image,
+              mimeType: source.mimeType,
               operation: source.operation || undefined,
               size: source.size || undefined,
             }, token, signal)
-          : await api.image({ prompt: text }, token, signal);
+          : await api.aiImage({ prompt: text }, token, signal);
         const img = d.images && d.images[0];
         setEditSource(null);
         setMessages([...next, img ? { role: 'assistant', image: absUrl(img.url), imageId: img.id || null } : { role: 'assistant', content: d.notice || 'No image returned.' }]);
@@ -560,15 +710,18 @@ export default function ChatConversationScreen({ navigation, route }) {
         const history = next.map((m, i) => ({ role: m.role, content: i === next.length - 1 ? (text || 'What is in this image?') : (typeof m.content === 'string' ? m.content : '') }));
         const d = await api.aiVision({ tier: mode, effort, skill, messages: history, images: [visionImage], lang }, token, signal);
         setMessages([...next, { role: 'assistant', content: d.reply || d.error || 'No reply.', model: d.modelLabel || 'Vision' }]);
+      } else if (att?.uploadId) {
+        const history = next.map((m, i) => ({role: m.role, content: i === next.length - 1 ? (text || `Analyze ${att.name}.`) : (typeof m.content === 'string' ? m.content : '')}));
+        const d = await api.aiVision({tier: mode, effort, messages: history, media: {uploadId: att.uploadId}, prompt: text || `Analyze ${att.name}.`, lang}, token, signal);
+        setMessages([...next, {role: 'assistant', content: d.reply || d.error || 'No reply.', model: d.modelLabel || 'Gemini media'}]);
       } else {
         let lastContent = text;
         if (att && att.kind === 'file' && att.text) {
           lastContent = 'Here is a file named "' + att.name + '":\n\n' + att.text.slice(0, 12000) + '\n\n' + (text || 'Please read this and help me.');
         }
         const msgs = next.map((m, i) => ({ role: m.role, content: i === next.length - 1 ? lastContent : (typeof m.content === 'string' ? m.content : '') }));
-        if (instrRef.current) msgs.unshift({ role: 'system', content: instrRef.current });
-        const payload = { model: 'auto', tier: mode, effort, skill, messages: msgs, lang };
-        const d = await api.chat(payload, token, signal);
+        const payload = {model: 'auto', tier: mode, effort, skill, messages: msgs, lang, system: instrRef.current || undefined};
+        const d = await api.aiChat(payload, token, signal);
         setMessages([...next, { role: 'assistant', content: d.reply, model: d.modelLabel }]);
         if (fromVoice && d.reply) {
           const spoken = await speakText(d.reply, token);
@@ -674,8 +827,24 @@ export default function ChatConversationScreen({ navigation, route }) {
         )}
         {messages.map((m, i) => (
           <View key={i} style={[styles.bubble, m.role === 'user' ? styles.user : styles.ai]}>
-            {m.role === 'assistant' && !m.pending && <Text style={styles.who}>{m.image ? 'Image' : 'OZIRA'}</Text>}
+            {m.role === 'assistant' && !m.pending && <Text style={styles.who}>{m.image ? 'Image' : m.videoJob ? t('geminiVideo') : 'OZIRA'}</Text>}
             {m.thumb ? <Image source={{ uri: m.thumb }} style={styles.thumb} /> : null}
+            {m.videoJob ? (
+              <VideoJobCard
+                job={m.videoJob}
+                token={token}
+                t={t}
+                onCancel={() => cancelVideoPoll(m.videoJob.jobId)}
+                onRetry={() => send(m.videoJob.prompt, false, {forceVideo: true})}
+              />
+            ) : m.video ? (
+              <MediaVideo uri={m.video} token={token} compact={m.role === 'user'} />
+            ) : m.audio ? (
+              <MediaAudio uri={m.audio} token={token} />
+            ) : null}
+            {m.fileName ? (
+              <View style={stylesForMedia.file}><Ionicons name="document-text" size={19} color="#FFFFFF" /><Text style={stylesForMedia.fileText} numberOfLines={2}>{m.fileName}</Text></View>
+            ) : null}
             {m.image ? (
               <Pressable onPress={() => setViewerImage({ url: m.image, id: m.imageId, prompt: m.content, index: i })} accessibilityRole="button" accessibilityLabel="Open generated image">
                 <Image source={{ uri: m.image }} style={styles.image} resizeMode="cover" />
@@ -685,13 +854,13 @@ export default function ChatConversationScreen({ navigation, route }) {
                 <Text style={styles.thinkingTxt}>{t('vThinking').replace('…', '')}</Text>
                 <ThinkingDots />
               </View>
-            ) : m.role === 'assistant' ? (
+            ) : m.role === 'assistant' && !m.videoJob && !m.video && !m.audio ? (
               // AI answers are markdown — render them as a formatted result,
               // not raw ** and ## in a chat bubble.
               <Markdown text={m.content} colors={colors} style={[styles.msgTxt, rtlText(rtl)]} />
-            ) : (
+            ) : m.content ? (
               <Text style={[styles.msgTxt, rtlText(rtl), { color: colors.text }]}>{m.content}</Text>
-            )}
+            ) : null}
             {!m.pending && m.content ? (
               <View style={[styles.actionRow, m.role === 'assistant' && styles.assistantActionRow]}>
                 {m.role === 'assistant' ? (
@@ -752,6 +921,11 @@ export default function ChatConversationScreen({ navigation, route }) {
             <Text style={[styles.statusHintTxt, { color: colors.gold }]}>Create-image mode on - tap to turn off</Text>
             <Ionicons name="close" size={14} color={colors.gold} />
           </Pressable>
+        ) : videoMode ? (
+          <Pressable onPress={() => setVideoMode(false)} style={styles.statusHint}>
+            <Text style={[styles.statusHintTxt, { color: colors.gold }]}>{t('videoModeOn')}</Text>
+            <Ionicons name="close" size={14} color={colors.gold} />
+          </Pressable>
         ) : research ? (
           <Pressable onPress={() => setResearch(false)} style={styles.statusHint}>
             <Text style={[styles.statusHintTxt, { color: colors.success }]}>Research mode on - I'll search the web</Text>
@@ -767,7 +941,7 @@ export default function ChatConversationScreen({ navigation, route }) {
         ) : null}
         {attachment ? (
           <View style={styles.attachChip}>
-            <Ionicons name={attachment.kind === 'photo' ? 'image' : 'document-text'} size={15} color={colors.primary} />
+            <Ionicons name={attachment.kind === 'photo' ? 'image' : attachment.kind === 'video' ? 'videocam' : attachment.kind === 'audio' ? 'musical-notes' : 'document-text'} size={15} color={colors.primary} />
             <Text style={styles.attachTxt} numberOfLines={1}>{attachment.name}</Text>
             <Pressable onPress={() => setAttachment(null)} hitSlop={8}><Ionicons name="close" size={16} color={colors.muted} /></Pressable>
           </View>
@@ -981,8 +1155,8 @@ export default function ChatConversationScreen({ navigation, route }) {
                   <Ionicons name={item.icon} size={20} color={colors.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.menuLabel}>{item.label}</Text>
-                  <Text style={styles.menuSub}>{item.sub}</Text>
+                  <Text style={styles.menuLabel}>{t(item.labelKey)}</Text>
+                  <Text style={styles.menuSub}>{t(item.subKey)}</Text>
                 </View>
                 {item.soon ? <Text style={styles.soon}>Soon</Text> : <Ionicons name="chevron-forward" size={16} color={colors.primary} />}
               </Pressable>

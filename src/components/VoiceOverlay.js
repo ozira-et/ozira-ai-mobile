@@ -1,318 +1,213 @@
-// True realtime voice mode. Microphone audio and model audio travel continuously
-// over one WebRTC connection; no recorded MP4, STT upload, chat call or TTS
-// download is used here. Normal voice messages remain file-based elsewhere.
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Modal, Animated, Easing } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { fonts } from '../theme';
+// Provider-neutral Gemini Live voice + optional camera frames. The permanent
+// provider key stays on the OZIRA backend; this client sends authenticated PCM,
+// text, and throttled JPEG frames over one OZIRA WebSocket protocol.
+import React, {useEffect, useMemo, useRef, useState} from 'react';
+import {View, Text, StyleSheet, Pressable, Modal, Animated, Easing} from 'react-native';
+import {Ionicons} from '@expo/vector-icons';
+import {CameraView, useCameraPermissions} from 'expo-camera';
+import {fonts} from '../theme';
 import Logo from './Logo';
-import { createRealtimeVoiceSession } from '../realtimeVoice';
-import { t as translate } from '../i18n';
+import {createRealtimeVoiceSession} from '../realtimeVoice';
+import {t as translate} from '../i18n';
 
 const RED = '#B3121B';
 const ON = '#FFFFFF';
 const DIM = 'rgba(255,255,255,0.8)';
 const HISTORY_TURNS = 8;
-const TRANSCRIPT_GROUNDED_LANGUAGES = new Set(['am', 'om', 'ti', 'ha']);
 
 function errorMessage(event) {
-  const value = event?.error?.message || event?.message || 'Realtime voice failed.';
+  const value = event?.error?.message || event?.message || 'Live voice failed.';
   const message = String(value).replace(/\s+/g, ' ').trim();
-  if (/quota|rate.?limit|billing|insufficient_quota/i.test(message)) {
-    return 'OpenAI realtime quota is unavailable. Check the OpenAI project billing and limits.';
-  }
-  if (/native module|webrtc.*null|not found.*webrtc/i.test(message)) return 'OZIRA_REALTIME_BUILD';
+  if (/quota|rate.?limit|billing|insufficient_quota/i.test(message)) return 'Gemini Live quota is unavailable. Check the Gemini project billing and limits.';
+  if (/native module|audiostudio|null|not installed/i.test(message)) return 'OZIRA_REALTIME_BUILD';
   return message.length > 220 ? message.slice(0, 217) + '…' : message;
 }
 
-function responseTranscript(event) {
-  const output = event?.response?.output || [];
-  for (const item of output) {
-    for (const part of item?.content || []) {
-      const text = part?.transcript || part?.text;
-      if (text) return String(text).trim();
-    }
-  }
-  return '';
-}
-
-export default function VoiceOverlay({
-  visible,
-  onClose,
-  token,
-  lang = 'en',
-  getHistory,
-  onExchange,
-}) {
+export default function VoiceOverlay({visible, onClose, token, lang = 'en', getHistory, onExchange}) {
   const styles = useMemo(() => makeStyles(), []);
   const [status, setStatus] = useState('idle');
   const [caption, setCaption] = useState('');
   const [error, setError] = useState('');
   const [connected, setConnected] = useState(false);
-
+  const [cameraOn, setCameraOn] = useState(false);
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const sessionRef = useRef(null);
   const abortRef = useRef(null);
   const epochRef = useRef(0);
   const historyRef = useRef([]);
-  const contextSentRef = useRef(false);
-  const userPartialRef = useRef(new Map());
   const userTextRef = useRef('');
   const answerTextRef = useRef('');
   const exchangeSavedRef = useRef(false);
-  const responseRequestedRef = useRef(false);
-  const flushTimerRef = useRef(null);
-
+  const cameraRef = useRef(null);
+  const cameraBusyRef = useRef(false);
   const pulse = useRef(new Animated.Value(0)).current;
   const ring = useRef(new Animated.Value(0)).current;
   const tr = (key) => translate(lang, key);
 
   useEffect(() => {
     if (visible) void start();
-    else stop();
-    return stop;
+    else void stop();
+    return () => { void stop(); };
   }, [visible, lang]);
 
   useEffect(() => {
-    const ringLoop = Animated.loop(Animated.timing(
-      ring,
-      { toValue: 1, duration: 1800, easing: Easing.out(Easing.ease), useNativeDriver: true },
-    ));
+    if (!visible || !connected || !cameraOn || !cameraPermission?.granted) return undefined;
+    const timer = setInterval(async () => {
+      if (!cameraRef.current || cameraBusyRef.current) return;
+      cameraBusyRef.current = true;
+      try {
+        const frame = await cameraRef.current.takePictureAsync({base64: true, quality: 0.35, skipProcessing: true, shutterSound: false});
+        if (frame?.base64) sessionRef.current?.sendCameraFrame?.(frame.base64, 'image/jpeg');
+      } catch (_) {}
+      finally { cameraBusyRef.current = false; }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [visible, connected, cameraOn, cameraPermission?.granted]);
+
+  useEffect(() => {
+    const ringLoop = Animated.loop(Animated.timing(ring, {toValue: 1, duration: 1800, easing: Easing.out(Easing.ease), useNativeDriver: true}));
     const pulseLoop = Animated.loop(Animated.sequence([
-      Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true }),
-      Animated.timing(pulse, { toValue: 0, duration: 700, useNativeDriver: true }),
+      Animated.timing(pulse, {toValue: 1, duration: 700, useNativeDriver: true}),
+      Animated.timing(pulse, {toValue: 0, duration: 700, useNativeDriver: true}),
     ]));
-    ringLoop.start();
-    pulseLoop.start();
+    ringLoop.start(); pulseLoop.start();
     return () => { ringLoop.stop(); pulseLoop.stop(); };
   }, []);
 
   function resetTurn() {
-    userPartialRef.current.clear();
     userTextRef.current = '';
     answerTextRef.current = '';
     exchangeSavedRef.current = false;
-    responseRequestedRef.current = false;
-    clearTimeout(flushTimerRef.current);
-    flushTimerRef.current = null;
   }
 
-  function stop() {
+  function saveExchange() {
+    if (exchangeSavedRef.current) return;
+    const user = userTextRef.current.trim();
+    const answer = answerTextRef.current.trim();
+    if (!user || !answer) return;
+    exchangeSavedRef.current = true;
+    onExchange?.(user, answer);
+    historyRef.current = [...historyRef.current, {role: 'user', content: user}, {role: 'assistant', content: answer}].slice(-HISTORY_TURNS);
+  }
+
+  async function stop() {
     epochRef.current += 1;
-    clearTimeout(flushTimerRef.current);
-    flushTimerRef.current = null;
-    abortRef.current?.abort();
-    abortRef.current = null;
-    sessionRef.current?.close?.();
-    sessionRef.current = null;
-    setConnected(false);
-    setStatus('idle');
+    abortRef.current?.abort(); abortRef.current = null;
+    const current = sessionRef.current; sessionRef.current = null;
+    await current?.close?.();
+    setConnected(false); setCameraOn(false); setStatus('idle');
   }
 
   async function start() {
-    stop();
+    await stop();
     const epoch = ++epochRef.current;
     const controller = new AbortController();
     abortRef.current = controller;
     historyRef.current = (getHistory?.() || []).slice(-HISTORY_TURNS);
-    contextSentRef.current = false;
-    resetTurn();
-    setError('');
-    setCaption('');
-    setStatus('connecting');
-
+    resetTurn(); setError(''); setCaption(''); setStatus('connecting');
     try {
       const session = await createRealtimeVoiceSession({
-        token,
-        lang,
-        signal: controller.signal,
-        onEvent: (event) => {
-          if (epoch === epochRef.current) handleEvent(event);
-        },
+        token, lang, signal: controller.signal,
+        onEvent: (event) => { if (epoch === epochRef.current) handleEvent(event); },
       });
-      if (epoch !== epochRef.current) {
-        session.close();
-        return;
-      }
+      if (epoch !== epochRef.current) { await session.close(); return; }
       sessionRef.current = session;
-      if (!contextSentRef.current) {
-        session.sendContext?.(historyRef.current);
-        contextSentRef.current = true;
-      }
+      session.sendContext?.(historyRef.current);
     } catch (event) {
       if (epoch !== epochRef.current || controller.signal.aborted) return;
-      setError(errorMessage(event));
-      setStatus('idle');
+      setError(errorMessage(event)); setStatus('idle');
     }
-  }
-
-  function maybeSaveExchange(wait = true) {
-    if (exchangeSavedRef.current) return;
-    const user = userTextRef.current.trim();
-    const answer = answerTextRef.current.trim();
-    if (user && answer) {
-      exchangeSavedRef.current = true;
-      clearTimeout(flushTimerRef.current);
-      flushTimerRef.current = null;
-      onExchange?.(user, answer);
-      historyRef.current = [...historyRef.current,
-        { role: 'user', content: user },
-        { role: 'assistant', content: answer },
-      ].slice(-HISTORY_TURNS);
-      return;
-    }
-    if (wait && answer && !flushTimerRef.current) {
-      flushTimerRef.current = setTimeout(() => {
-        flushTimerRef.current = null;
-        maybeSaveExchange(false);
-      }, 2500);
-    }
-  }
-
-  function beginUserTurn() {
-    maybeSaveExchange(false);
-    resetTurn();
-    setError('');
-    setCaption('');
-    setStatus('listening');
   }
 
   function handleEvent(event) {
     switch (event?.type) {
-      case 'ozira.data.open':
-        setConnected(true);
-        setStatus('listening');
-        if (!contextSentRef.current && sessionRef.current) {
-          sessionRef.current.sendContext?.(historyRef.current);
-          contextSentRef.current = true;
-        }
+      case 'ready':
+        setConnected(true); setStatus('listening'); setError('');
         break;
-      case 'ozira.connection':
-        if (event.state === 'connected') {
-          setConnected(true);
-          setStatus((value) => value === 'connecting' ? 'listening' : value);
-        } else if (event.state === 'failed' || event.state === 'disconnected') {
-          setConnected(false);
-          setError('OZIRA_REALTIME_INTERRUPTED');
-          setStatus('idle');
-        }
+      case 'connection':
+        if (event.state === 'connected') setConnected(true);
+        if (event.state === 'failed') { setConnected(false); setError('OZIRA_REALTIME_INTERRUPTED'); setStatus('idle'); }
         break;
-      case 'input_audio_buffer.speech_started':
-        beginUserTurn();
-        break;
-      case 'input_audio_buffer.speech_stopped':
-        setStatus('thinking');
-        break;
-      case 'conversation.item.input_audio_transcription.delta': {
-        const itemId = event.item_id || 'current';
-        const next = (userPartialRef.current.get(itemId) || '') + (event.delta || '');
-        userPartialRef.current.set(itemId, next);
-        if (next.trim()) setCaption('“' + next.trim() + '”');
-        break;
-      }
-      case 'conversation.item.input_audio_transcription.completed': {
-        const text = String(event.transcript || '').trim();
-        if (text) {
+      case 'transcript': {
+        const text = String(event.text || '').trim();
+        if (!text) break;
+        if (event.source === 'user') {
+          if (exchangeSavedRef.current) resetTurn();
           userTextRef.current = text;
-          setCaption('“' + text + '”');
-          if (TRANSCRIPT_GROUNDED_LANGUAGES.has(lang) && !responseRequestedRef.current) {
-            responseRequestedRef.current = true;
-            setStatus('thinking');
-            sessionRef.current?.respondToTranscript?.(event.item_id, text);
-          }
-          maybeSaveExchange();
-        }
-        break;
-      }
-      case 'conversation.item.input_audio_transcription.failed':
-        if (TRANSCRIPT_GROUNDED_LANGUAGES.has(lang) && !responseRequestedRef.current) {
-          responseRequestedRef.current = true;
-          setStatus('thinking');
-          sessionRef.current?.respondToLatestAudio?.();
-        }
-        break;
-      case 'response.created':
-        setStatus('thinking');
-        break;
-      case 'response.output_audio_transcript.delta':
-        answerTextRef.current += event.delta || '';
-        if (answerTextRef.current.trim()) {
-          setCaption(answerTextRef.current.trim());
-          setStatus('speaking');
-        }
-        break;
-      case 'response.output_audio_transcript.done': {
-        const text = String(event.transcript || answerTextRef.current || '').trim();
-        if (text) {
+          setCaption('“' + text + '”'); setStatus('thinking');
+        } else {
           answerTextRef.current = text;
-          setCaption(text);
-          setStatus('speaking');
-          maybeSaveExchange();
+          setCaption(text); setStatus('speaking'); saveExchange();
         }
         break;
       }
-      case 'response.done': {
-        const text = responseTranscript(event) || answerTextRef.current;
-        if (text) {
-          answerTextRef.current = text;
-          setCaption(text);
-          maybeSaveExchange();
-        }
-        if (event?.response?.status === 'failed') {
-          setError(errorMessage(event.response.status_details));
-          setStatus('listening');
-        }
+      case 'text_delta':
+        answerTextRef.current += event.text || '';
+        if (answerTextRef.current.trim()) { setCaption(answerTextRef.current.trim()); setStatus('speaking'); }
         break;
-      }
-      case 'output_audio_buffer.stopped':
-        maybeSaveExchange();
-        setStatus('listening');
+      case 'audio_delta':
+        setStatus('speaking');
         break;
-      case 'response.cancelled':
-        maybeSaveExchange(false);
-        setStatus('listening');
+      case 'turn_complete':
+        saveExchange(); setStatus('listening');
+        break;
+      case 'interrupted':
+        saveExchange(); setStatus('listening');
+        break;
+      case 'reconnecting':
+        setStatus('connecting'); setConnected(false);
+        break;
+      case 'session_expired':
+        setError(event.message || 'Live session ended. Reopen it to continue.'); setStatus('idle'); setConnected(false);
         break;
       case 'error':
-        setError(errorMessage(event));
-        setStatus(connected ? 'listening' : 'idle');
+        setError(errorMessage(event)); setStatus(connected ? 'listening' : 'idle');
         break;
       default:
         break;
     }
   }
 
-  const ringScale = ring.interpolate({ inputRange: [0, 1], outputRange: [1, 1.9] });
-  const ringOpacity = ring.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0] });
+  async function toggleCamera() {
+    if (!cameraOn && !cameraPermission?.granted) {
+      const result = await requestCameraPermission();
+      if (!result.granted) { setError(tr('vCameraPermission')); return; }
+    }
+    setCameraOn((value) => !value);
+  }
+
+  const ringScale = ring.interpolate({inputRange: [0, 1], outputRange: [1, 1.9]});
+  const ringOpacity = ring.interpolate({inputRange: [0, 1], outputRange: [0.45, 0]});
   const active = status === 'listening' || status === 'speaking';
-  const pulseScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, active ? 1.08 : 1.02] });
+  const pulseScale = pulse.interpolate({inputRange: [0, 1], outputRange: [1, active ? 1.08 : 1.02]});
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
-        <View style={styles.card}>
-          <Pressable onPress={onClose} hitSlop={12} style={styles.close}>
+        <View style={[styles.card, cameraOn && styles.cardCamera]}>
+          <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel={tr('close')} hitSlop={12} style={styles.close}>
             <Ionicons name="close" size={20} color={ON} />
           </Pressable>
-
-          <View style={styles.globeWrap}>
-            <Animated.View style={[styles.ring, { transform: [{ scale: ringScale }], opacity: active ? ringOpacity : 0 }]} />
-            <Animated.View style={[styles.ring2, { transform: [{ scale: ringScale }], opacity: active ? ringOpacity : 0 }]} />
-            <Animated.View style={[styles.globe, { transform: [{ scale: pulseScale }] }]}>
-              <Logo size={54} />
-            </Animated.View>
-          </View>
-
+          {cameraOn && cameraPermission?.granted ? (
+            <CameraView ref={cameraRef} style={styles.camera} facing="front" animateShutter={false} />
+          ) : (
+            <View style={styles.globeWrap}>
+              <Animated.View style={[styles.ring, {transform: [{scale: ringScale}], opacity: active ? ringOpacity : 0}]} />
+              <Animated.View style={[styles.ring2, {transform: [{scale: ringScale}], opacity: active ? ringOpacity : 0}]} />
+              <Animated.View style={[styles.globe, {transform: [{scale: pulseScale}]}]}><Logo size={54} /></Animated.View>
+            </View>
+          )}
           <Text style={styles.status}>
-            {status === 'connecting' ? tr('vConnecting')
-              : status === 'listening' ? tr('vListening')
-                : status === 'thinking' ? tr('vThinking')
-                  : status === 'speaking' ? tr('vSpeaking') : tr('vIdle')}
+            {status === 'connecting' ? tr('vConnecting') : status === 'listening' ? tr('vListening') : status === 'thinking' ? tr('vThinking') : status === 'speaking' ? tr('vSpeaking') : tr('vIdle')}
           </Text>
           {!!caption && <Text style={styles.caption} numberOfLines={4}>{caption}</Text>}
-          {!!error && <Text style={styles.err}>
-            {error === 'OZIRA_REALTIME_BUILD' ? tr('vRealtimeBuild')
-              : error === 'OZIRA_REALTIME_INTERRUPTED' ? tr('vRealtimeInterrupted') : error}
-          </Text>}
-          <Text style={styles.hint}>{connected ? 'OZIRA · LIVE' : ''}</Text>
+          {!!error && <Text style={styles.err}>{error === 'OZIRA_REALTIME_BUILD' ? tr('vRealtimeBuild') : error === 'OZIRA_REALTIME_INTERRUPTED' ? tr('vRealtimeInterrupted') : error}</Text>}
+          <View style={styles.actions}>
+            <Pressable onPress={toggleCamera} accessibilityRole="button" accessibilityLabel={cameraOn ? tr('vCameraOff') : tr('vCameraOn')} style={[styles.action, cameraOn && styles.actionOn]}>
+              <Ionicons name={cameraOn ? 'videocam' : 'videocam-outline'} size={20} color={ON} />
+            </Pressable>
+          </View>
+          <Text style={styles.hint}>{connected ? 'OZIRA · GEMINI LIVE' : ''}</Text>
         </View>
       </View>
     </Modal>
@@ -320,15 +215,20 @@ export default function VoiceOverlay({
 }
 
 const makeStyles = () => StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', padding: 28 },
-  card: { width: 280, borderRadius: 28, backgroundColor: RED, alignItems: 'center', paddingTop: 26, paddingBottom: 24, paddingHorizontal: 20 },
-  close: { position: 'absolute', top: 12, right: 12, padding: 4 },
-  globeWrap: { width: 160, height: 160, alignItems: 'center', justifyContent: 'center', marginTop: 6 },
-  ring: { position: 'absolute', width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(255,255,255,0.25)' },
-  ring2: { position: 'absolute', width: 120, height: 120, borderRadius: 60, borderWidth: 2, borderColor: 'rgba(255,255,255,0.4)' },
-  globe: { width: 96, height: 96, borderRadius: 48, backgroundColor: ON, alignItems: 'center', justifyContent: 'center' },
-  status: { color: ON, fontFamily: fonts.semibold, fontSize: 17, marginTop: 18 },
-  caption: { color: DIM, fontFamily: fonts.regular, fontSize: 13.5, textAlign: 'center', marginTop: 10, lineHeight: 19 },
-  err: { color: '#FFE08A', fontFamily: fonts.medium, fontSize: 12.5, textAlign: 'center', marginTop: 8 },
-  hint: { color: DIM, fontFamily: fonts.regular, fontSize: 12, marginTop: 12 },
+  backdrop: {flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', padding: 28},
+  card: {width: 280, borderRadius: 28, backgroundColor: RED, alignItems: 'center', paddingTop: 26, paddingBottom: 20, paddingHorizontal: 20},
+  cardCamera: {width: 320},
+  close: {position: 'absolute', top: 12, right: 12, padding: 4, zIndex: 3},
+  globeWrap: {width: 160, height: 160, alignItems: 'center', justifyContent: 'center', marginTop: 6},
+  ring: {position: 'absolute', width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(255,255,255,0.25)'},
+  ring2: {position: 'absolute', width: 120, height: 120, borderRadius: 60, borderWidth: 2, borderColor: 'rgba(255,255,255,0.4)'},
+  globe: {width: 96, height: 96, borderRadius: 48, backgroundColor: ON, alignItems: 'center', justifyContent: 'center'},
+  camera: {width: 272, height: 180, borderRadius: 18, overflow: 'hidden', marginTop: 8},
+  status: {color: ON, fontFamily: fonts.semibold, fontSize: 17, marginTop: 16},
+  caption: {color: DIM, fontFamily: fonts.regular, fontSize: 13.5, textAlign: 'center', marginTop: 10, lineHeight: 19},
+  err: {color: '#FFE08A', fontFamily: fonts.medium, fontSize: 12.5, textAlign: 'center', marginTop: 8},
+  actions: {flexDirection: 'row', marginTop: 12},
+  action: {width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)'},
+  actionOn: {backgroundColor: 'rgba(255,255,255,0.22)'},
+  hint: {color: DIM, fontFamily: fonts.regular, fontSize: 11, marginTop: 10},
 });

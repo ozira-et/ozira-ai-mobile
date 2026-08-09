@@ -54,6 +54,7 @@ const T = {
     voiceBrand: 'OZIRA · Voice', tapToTalk: 'Tap to talk', tapToSend: 'Tap to send',
     vIdle: 'Tap the mic and start talking', vConnecting: 'Connecting…', vListening: 'Listening…', vThinking: 'Thinking…', vSpeaking: 'Speaking…',
     vRealtimeBuild: 'Realtime voice needs the OZIRA development build. It cannot run inside Expo Go.', vRealtimeInterrupted: 'The realtime connection was interrupted. Close and reopen Live Voice.',
+    vCameraOn: 'Turn camera on', vCameraOff: 'Turn camera off', vCameraPermission: 'Camera permission is required to share live frames.',
     menu: 'Menu', mTools: 'AI Tools', mToolsSub: 'Writer, translator, tutor and more', mPlans: 'Plans & Pricing',
     menuWorkspace: 'Workspace', menuTools: 'Tools', menuAccount: 'Account',
     mPlansSub: 'Your plan and upgrades', mUsage: 'Usage & Storage', mUsageSub: 'Limits and space used', mLibrary: 'Library',
@@ -94,6 +95,7 @@ const T = {
     voiceBrand: 'OZIRA · ድምፅ', tapToTalk: 'ለመናገር ይንኩ', tapToSend: 'ለመላክ ይንኩ',
     vIdle: 'ማይኩን ነክተው መናገር ይጀምሩ', vConnecting: 'በመገናኘት ላይ…', vListening: 'በማዳመጥ ላይ…', vThinking: 'በማሰብ ላይ…', vSpeaking: 'በመናገር ላይ…',
     vRealtimeBuild: 'የቀጥታ ድምፅ የOZIRA የሙከራ ግንባታን ይፈልጋል። በExpo Go ውስጥ አይሰራም።', vRealtimeInterrupted: 'የቀጥታ ግንኙነቱ ተቋርጧል። የቀጥታ ድምፅን ዝግተው እንደገና ይክፈቱ።',
+    vCameraOn: 'ካሜራ ክፈት', vCameraOff: 'ካሜራ ዝጋ', vCameraPermission: 'የቀጥታ ምስሎችን ለማጋራት የካሜራ ፈቃድ ያስፈልጋል።',
     menu: 'ማውጫ', mTools: 'የAI መሣሪያዎች', mToolsSub: 'ጸሐፊ፣ ተርጓሚ፣ አስተማሪ እና ተጨማሪ', mPlans: 'ዕቅዶች እና ዋጋ',
     menuWorkspace: 'የስራ ቦታ', menuTools: 'መሣሪያዎች', menuAccount: 'መለያ',
     mPlansSub: 'የእርስዎ ዕቅድ እና ማሻሻያዎች', mUsage: 'አጠቃቀም እና ማከማቻ', mUsageSub: 'ገደቦች እና የተጠቀመ ቦታ', mLibrary: 'ቤተ መጻሕፍት',
@@ -134,6 +136,7 @@ const T = {
     voiceBrand: 'OZIRA · Sagalee', tapToTalk: 'Dubbachuuf tuqi', tapToSend: 'Erguuf tuqi',
     vIdle: 'Maayikii tuqiitii dubbachuu jalqabi', vConnecting: 'Wal qunnamaa jira…', vListening: 'Dhaggeeffachaa jira…', vThinking: 'Yaadaa jira…', vSpeaking: 'Dubbachaa jira…',
     vRealtimeBuild: 'Sagaleen yeroo-dhugaa ijaarsa yaalii OZIRA barbaada. Expo Go keessatti hin hojjetu.', vRealtimeInterrupted: 'Walqunnamtiin yeroo-dhugaa addaan cite. Sagalee yeroo-dhugaa cufii irra deebiʼii bani.',
+    vCameraOn: 'Kaameraa bani', vCameraOff: 'Kaameraa cufi', vCameraPermission: 'Suuraa kallattii qooduuf hayyamni kaameraa barbaachisa.',
     menu: 'Baafata', mTools: 'Meeshaalee AI', mToolsSub: 'Barreessaa, hiikaa, barsiisaa fi kkf', mPlans: 'Karoora fi Gatii',
     menuWorkspace: 'Bakka hojii', menuTools: 'Meeshaalee', menuAccount: 'Herrega',
     mPlansSub: 'Karoora kee fi fooyyaʼinsa', mUsage: 'Itti fayyadama fi Kuusaa', mUsageSub: 'Daangaa fi bakka fayyadame', mLibrary: 'Mankuusaa',
@@ -174,6 +177,7 @@ const T = {
     voiceBrand: 'OZIRA · ድምጺ', tapToTalk: 'ንምዝራብ ተንክፍ', tapToSend: 'ንምስዳድ ተንክፍ',
     vIdle: 'ማይክ ተንኪፍካ ተዛረብ ጀምር', vConnecting: 'ይራኸብ ኣሎ…', vListening: 'ይሰምዕ ኣሎ…', vThinking: 'ይሓስብ ኣሎ…', vSpeaking: 'ይዛረብ ኣሎ…',
     vRealtimeBuild: 'ቀጥታዊ ድምጺ ናይ OZIRA ናይ ሙከራ ህንጸት የድልዮ። ኣብ Expo Go ኣይሰርሕን።', vRealtimeInterrupted: 'እቲ ቀጥታዊ ምትእስሳር ተቛሪጹ። ቀጥታዊ ድምጺ ዓጽውካ እንደገና ክፈቶ።',
+    vCameraOn: 'ካሜራ ክፈት', vCameraOff: 'ካሜራ ዕጸው', vCameraPermission: 'ቀጥታዊ ምስልታት ንምክፋል ፍቓድ ካሜራ የድሊ።',
     menu: 'ዝርዝር', mTools: 'መሳርሒታት AI', mToolsSub: 'ጸሓፊ፣ ተርጓሚ፣ መምህር ከምኡውን ካልእ', mPlans: 'መደባትን ዋጋን',
     menuWorkspace: 'ናይ ስራሕ ቦታ', menuTools: 'መሳርሒታት', menuAccount: 'ሕሳብ',
     mPlansSub: 'መደብካን ምምሕያሻትን', mUsage: 'ኣጠቓቕማን ማዕከንን', mUsageSub: 'ደረታትን ዝተጠቐመ ቦታን', mLibrary: 'ቤተ መጻሕፍቲ',
@@ -214,6 +218,7 @@ const T = {
     voiceBrand: 'OZIRA · الصوت', tapToTalk: 'اضغط للتحدث', tapToSend: 'اضغط للإرسال',
     vIdle: 'اضغط على الميكروفون وابدأ الحديث', vConnecting: 'جارٍ الاتصال…', vListening: 'يستمع…', vThinking: 'يفكر…', vSpeaking: 'يتحدث…',
     vRealtimeBuild: 'يتطلب الصوت الفوري نسخة OZIRA التطويرية، ولا يعمل داخل Expo Go.', vRealtimeInterrupted: 'انقطع الاتصال الفوري. أغلق المحادثة الصوتية وافتحها مجددًا.',
+    vCameraOn: 'تشغيل الكاميرا', vCameraOff: 'إيقاف الكاميرا', vCameraPermission: 'يلزم إذن الكاميرا لمشاركة الإطارات المباشرة.',
     menu: 'القائمة', mTools: 'أدوات الذكاء الاصطناعي', mToolsSub: 'كاتب ومترجم ومعلم والمزيد', mPlans: 'الخطط والأسعار',
     menuWorkspace: 'مساحة العمل', menuTools: 'الأدوات', menuAccount: 'الحساب',
     mPlansSub: 'خطتك والترقيات', mUsage: 'الاستخدام والتخزين', mUsageSub: 'الحدود والمساحة المستخدمة', mLibrary: 'المكتبة',
@@ -254,6 +259,7 @@ const T = {
     voiceBrand: 'OZIRA · Sauti', tapToTalk: 'Gusa kuzungumza', tapToSend: 'Gusa kutuma',
     vIdle: 'Gusa maikrofoni uanze kuzungumza', vConnecting: 'Inaunganisha…', vListening: 'Inasikiliza…', vThinking: 'Inafikiri…', vSpeaking: 'Inazungumza…',
     vRealtimeBuild: 'Sauti ya moja kwa moja inahitaji toleo la maendeleo la OZIRA. Haifanyi kazi ndani ya Expo Go.', vRealtimeInterrupted: 'Muunganisho wa moja kwa moja umekatika. Funga na ufungue tena Sauti ya Moja kwa Moja.',
+    vCameraOn: 'Washa kamera', vCameraOff: 'Zima kamera', vCameraPermission: 'Ruhusa ya kamera inahitajika kushiriki picha za moja kwa moja.',
     menu: 'Menyu', mTools: 'Vifaa vya AI', mToolsSub: 'Mwandishi, mtafsiri, mwalimu na zaidi', mPlans: 'Mipango na Bei',
     menuWorkspace: 'Eneo la kazi', menuTools: 'Zana', menuAccount: 'Akaunti',
     mPlansSub: 'Mpango wako na maboresho', mUsage: 'Matumizi na Hifadhi', mUsageSub: 'Vikomo na nafasi iliyotumika', mLibrary: 'Maktaba',
@@ -294,6 +300,7 @@ const T = {
     voiceBrand: 'OZIRA · Voix', tapToTalk: 'Touchez pour parler', tapToSend: 'Touchez pour envoyer',
     vIdle: 'Touchez le micro et parlez', vConnecting: 'Connexion…', vListening: 'Écoute…', vThinking: 'Réflexion…', vSpeaking: 'Parle…',
     vRealtimeBuild: 'La voix en temps réel nécessite la version de développement OZIRA. Elle ne fonctionne pas dans Expo Go.', vRealtimeInterrupted: 'La connexion en temps réel a été interrompue. Fermez puis rouvrez la voix en direct.',
+    vCameraOn: 'Activer la caméra', vCameraOff: 'Désactiver la caméra', vCameraPermission: 'L’autorisation de la caméra est requise pour partager des images en direct.',
     menu: 'Menu', mTools: 'Outils IA', mToolsSub: 'Rédacteur, traducteur, tuteur et plus', mPlans: 'Forfaits et tarifs',
     menuWorkspace: 'Espace de travail', menuTools: 'Outils', menuAccount: 'Compte',
     mPlansSub: 'Votre forfait et mises à niveau', mUsage: 'Utilisation et stockage', mUsageSub: 'Limites et espace utilisé', mLibrary: 'Bibliothèque',
@@ -334,6 +341,7 @@ const T = {
     voiceBrand: 'OZIRA · Murya', tapToTalk: 'Danna don magana', tapToSend: 'Danna don aikawa',
     vIdle: 'Danna makurufo ka fara magana', vConnecting: 'Ana haɗawa…', vListening: 'Yana saurara…', vThinking: 'Yana tunani…', vSpeaking: 'Yana magana…',
     vRealtimeBuild: 'Muryar kai tsaye tana buƙatar sigar gwajin OZIRA. Ba ta aiki a cikin Expo Go.', vRealtimeInterrupted: 'Haɗin kai tsaye ya katse. Rufe sannan ka sake buɗe Muryar Kai Tsaye.',
+    vCameraOn: 'Kunna kamara', vCameraOff: 'Kashe kamara', vCameraPermission: 'Ana buƙatar izinin kamara don raba hotunan kai tsaye.',
     menu: 'Menu', mTools: 'Kayan aikin AI', mToolsSub: 'Marubuci, mai fassara, malami da ƙari', mPlans: 'Tsare-tsare da Farashi',
     menuWorkspace: 'Wurin aiki', menuTools: 'Kayan aiki', menuAccount: 'Asusu',
     mPlansSub: 'Tsarinka da haɓakawa', mUsage: 'Amfani da Ajiya', mUsageSub: 'Iyaka da wurin da aka yi amfani', mLibrary: 'Ɗakin karatu',
@@ -435,13 +443,29 @@ const IMAGE_TOOL_T = {
   },
 };
 
+// Multimodal chat controls are kept as one complete translation table so a new
+// camera, upload, or async-video state cannot silently fall back to English.
+const MEDIA_TOOL_T = {
+  en: {attachPhoto:'Photo',attachPhotoSub:'Send a picture to the AI',attachCamera:'Camera',attachCameraSub:'Take a photo now',attachVideo:'Video',attachVideoSub:'Analyze a gallery video',recordVideo:'Record video',recordVideoSub:'Capture a video to analyze',attachFile:'File',attachFileSub:'PDF, text or document',createImage:'Create image',createImageSub:'Generate a picture with AI',createVideo:'Create video',createVideoSub:'Generate an asynchronous Gemini video',research:'Research',researchSub:'Search the web to answer',connectors:'Connectors',connectorsSub:'Link Telegram, Drive and Gmail',geminiVideo:'Gemini video',videoFailed:'Generation failed',videoCancelled:'Polling cancelled',videoGenerating:'generating asynchronously',videoModeOn:'Create-video mode on — tap to turn off',retry:'Retry'},
+  am: {attachPhoto:'ፎቶ',attachPhotoSub:'ምስል ወደ AI ላክ',attachCamera:'ካሜራ',attachCameraSub:'አሁን ፎቶ አንሳ',attachVideo:'ቪዲዮ',attachVideoSub:'ከማዕከለ-ስዕላት ቪዲዮ ተንትን',recordVideo:'ቪዲዮ ቅረጽ',recordVideoSub:'ለመተንተን ቪዲዮ ቅረጽ',attachFile:'ፋይል',attachFileSub:'PDF፣ ጽሑፍ ወይም ሰነድ',createImage:'ምስል ፍጠር',createImageSub:'በAI ምስል ፍጠር',createVideo:'ቪዲዮ ፍጠር',createVideoSub:'የGemini ቪዲዮ በጀርባ ፍጠር',research:'ምርምር',researchSub:'መልስ ለማግኘት ድርን ፈልግ',connectors:'አገናኞች',connectorsSub:'Telegram፣ Drive እና Gmail አገናኝ',geminiVideo:'Gemini ቪዲዮ',videoFailed:'መፍጠር አልተሳካም',videoCancelled:'ሁኔታ መፈተሽ ተሰርዟል',videoGenerating:'በጀርባ እየተፈጠረ ነው',videoModeOn:'የቪዲዮ ፈጠራ ሁነታ በርቷል — ለማጥፋት ይንኩ',retry:'እንደገና ሞክር'},
+  om: {attachPhoto:'Suuraa',attachPhotoSub:'Suuraa gara AI ergi',attachCamera:'Kaameraa',attachCameraSub:'Amma suuraa kaasi',attachVideo:'Viidiyoo',attachVideoSub:'Viidiyoo kuusaa keessaa xiinxali',recordVideo:'Viidiyoo waraabi',recordVideoSub:'Viidiyoo xiinxaluuf waraabi',attachFile:'Faayilii',attachFileSub:'PDF, barruu ykn sanada',createImage:'Fakkii uumi',createImageSub:'AI dhaan fakkii uumi',createVideo:'Viidiyoo uumi',createVideoSub:'Viidiyoo Gemini duubaan uumi',research:'Qorannoo',researchSub:'Deebii argachuuf weebii barbaadi',connectors:'Walqunnamsiistota',connectorsSub:'Telegram, Drive fi Gmail wal qunnamsiisi',geminiVideo:'Viidiyoo Gemini',videoFailed:'Uumuun hin milkoofne',videoCancelled:'Hordoffiin haqame',videoGenerating:'duubaan uumamaa jira',videoModeOn:'Haalli viidiyoo uumuu baname — cufuuf tuqi',retry:'Irra deebiʼi'},
+  ti: {attachPhoto:'ስእሊ',attachPhotoSub:'ስእሊ ናብ AI ስደድ',attachCamera:'ካሜራ',attachCameraSub:'ሕጂ ስእሊ ኣልዕል',attachVideo:'ቪድዮ',attachVideoSub:'ቪድዮ ካብ ማዕከል ስእሊ ተንትን',recordVideo:'ቪድዮ ቅረጽ',recordVideoSub:'ንትንተና ቪድዮ ቅረጽ',attachFile:'ፋይል',attachFileSub:'PDF፣ ጽሑፍ ወይ ሰነድ',createImage:'ስእሊ ፍጠር',createImageSub:'ብAI ስእሊ ፍጠር',createVideo:'ቪድዮ ፍጠር',createVideoSub:'ቪድዮ Gemini ብድሕሪት ፍጠር',research:'ምርምር',researchSub:'መልሲ ንምርካብ ዌብ ድለ',connectors:'መራኸብቲ',connectorsSub:'Telegram፣ Driveን Gmailን ኣራኽብ',geminiVideo:'ቪድዮ Gemini',videoFailed:'ምፍጣር ኣይሰለጠን',videoCancelled:'ምክትታል ተሰሪዙ',videoGenerating:'ብድሕሪት ይፍጠር ኣሎ',videoModeOn:'ናይ ቪድዮ ፈጠራ ሁነታ ተወሊዑ — ንምጥፋእ ጠውቕ',retry:'ደጊምካ ፈትን'},
+  ar: {attachPhoto:'صورة',attachPhotoSub:'إرسال صورة إلى الذكاء الاصطناعي',attachCamera:'الكاميرا',attachCameraSub:'التقاط صورة الآن',attachVideo:'فيديو',attachVideoSub:'تحليل فيديو من المعرض',recordVideo:'تسجيل فيديو',recordVideoSub:'تصوير فيديو لتحليله',attachFile:'ملف',attachFileSub:'PDF أو نص أو مستند',createImage:'إنشاء صورة',createImageSub:'إنشاء صورة بالذكاء الاصطناعي',createVideo:'إنشاء فيديو',createVideoSub:'إنشاء فيديو Gemini بشكل غير متزامن',research:'بحث',researchSub:'البحث في الويب للإجابة',connectors:'التكاملات',connectorsSub:'ربط Telegram وDrive وGmail',geminiVideo:'فيديو Gemini',videoFailed:'فشل الإنشاء',videoCancelled:'أُلغي التحقق من الحالة',videoGenerating:'يتم الإنشاء في الخلفية',videoModeOn:'وضع إنشاء الفيديو مفعّل — اضغط لإيقافه',retry:'إعادة المحاولة'},
+  sw: {attachPhoto:'Picha',attachPhotoSub:'Tuma picha kwa AI',attachCamera:'Kamera',attachCameraSub:'Piga picha sasa',attachVideo:'Video',attachVideoSub:'Changanua video ya galari',recordVideo:'Rekodi video',recordVideoSub:'Nasa video ya kuchanganua',attachFile:'Faili',attachFileSub:'PDF, maandishi au hati',createImage:'Unda picha',createImageSub:'Tengeneza picha kwa AI',createVideo:'Unda video',createVideoSub:'Tengeneza video ya Gemini kwa nyuma',research:'Utafiti',researchSub:'Tafuta wavuti kupata jibu',connectors:'Viunganishi',connectorsSub:'Unganisha Telegram, Drive na Gmail',geminiVideo:'Video ya Gemini',videoFailed:'Utengenezaji umeshindwa',videoCancelled:'Ufuatiliaji umesitishwa',videoGenerating:'inatengenezwa kwa nyuma',videoModeOn:'Hali ya kuunda video imewashwa — gusa kuzima',retry:'Jaribu tena'},
+  fr: {attachPhoto:'Photo',attachPhotoSub:'Envoyer une image à l’IA',attachCamera:'Caméra',attachCameraSub:'Prendre une photo',attachVideo:'Vidéo',attachVideoSub:'Analyser une vidéo de la galerie',recordVideo:'Filmer',recordVideoSub:'Filmer une vidéo à analyser',attachFile:'Fichier',attachFileSub:'PDF, texte ou document',createImage:'Créer une image',createImageSub:'Générer une image avec l’IA',createVideo:'Créer une vidéo',createVideoSub:'Générer une vidéo Gemini en arrière-plan',research:'Recherche',researchSub:'Chercher sur le Web pour répondre',connectors:'Connecteurs',connectorsSub:'Relier Telegram, Drive et Gmail',geminiVideo:'Vidéo Gemini',videoFailed:'Échec de la génération',videoCancelled:'Suivi annulé',videoGenerating:'génération en arrière-plan',videoModeOn:'Mode création vidéo activé — touchez pour désactiver',retry:'Réessayer'},
+  ha: {attachPhoto:'Hoto',attachPhotoSub:'Aika hoto zuwa AI',attachCamera:'Kamara',attachCameraSub:'Ɗauki hoto yanzu',attachVideo:'Bidiyo',attachVideoSub:'Binciki bidiyo daga ma’ajiya',recordVideo:'Ɗauki bidiyo',recordVideoSub:'Ɗauki bidiyo don bincike',attachFile:'Fayil',attachFileSub:'PDF, rubutu ko takarda',createImage:'Ƙirƙiri hoto',createImageSub:'Ƙirƙiri hoto da AI',createVideo:'Ƙirƙiri bidiyo',createVideoSub:'Ƙirƙiri bidiyon Gemini a baya',research:'Bincike',researchSub:'Nemi amsa a yanar gizo',connectors:'Masu haɗawa',connectorsSub:'Haɗa Telegram, Drive da Gmail',geminiVideo:'Bidiyon Gemini',videoFailed:'Ƙirƙirawa ta gaza',videoCancelled:'An soke bibiyar',videoGenerating:'ana ƙirƙirawa a baya',videoModeOn:'Yanayin ƙirƙirar bidiyo yana kunne — taɓa don kashewa',retry:'Sake gwadawa'},
+};
+
 export function t(lang, key, vars) {
   const dict = T[lang] || T.en;
   const imageDict = IMAGE_TOOL_T[lang] || IMAGE_TOOL_T.en;
+  const mediaDict = MEDIA_TOOL_T[lang] || MEDIA_TOOL_T.en;
   let s = (dict[key] != null ? dict[key]
     : (imageDict[key] != null ? imageDict[key]
-      : (T.en[key] != null ? T.en[key]
-        : (IMAGE_TOOL_T.en[key] != null ? IMAGE_TOOL_T.en[key] : key))));
+      : (mediaDict[key] != null ? mediaDict[key]
+        : (T.en[key] != null ? T.en[key]
+          : (IMAGE_TOOL_T.en[key] != null ? IMAGE_TOOL_T.en[key]
+            : (MEDIA_TOOL_T.en[key] != null ? MEDIA_TOOL_T.en[key] : key))))));
   if (vars) for (const k in vars) s = s.replace('{' + k + '}', vars[k]);
   return s;
 }

@@ -42,11 +42,30 @@
     },
     "androidNavigationBar": {
       "backgroundColor": "#0B0B12",
-      "barStyle": "light-content",
-      "contrastEnforced": false
+      "barStyle": "light-content"
     },
     "plugins": [
       "expo-audio",
+      [
+        "@siteed/audio-studio",
+        {
+          "enablePhoneStateHandling": false,
+          "enableNotifications": false,
+          "enableBackgroundAudio": false,
+          "enableDeviceDetection": false,
+          "iosConfig": {
+            "microphoneUsageDescription": "Allow OZIRA AI to use your microphone for Live voice."
+          }
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow OZIRA AI to share camera frames during Live conversations.",
+          "microphonePermission": "Allow OZIRA AI to use your microphone for Live voice.",
+          "recordAudioAndroid": false
+        }
+      ],
       [
         "expo-media-library",
         {
@@ -57,8 +76,8 @@
           ]
         }
       ],
-      "@config-plugins/react-native-webrtc",
-      "expo-asset"
+      "expo-asset",
+      "expo-video"
     ],
     "extra": {
       "eas": {

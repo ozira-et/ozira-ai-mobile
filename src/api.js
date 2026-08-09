@@ -1,9 +1,23 @@
 import { config } from './config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import {FileSystemUploadType, uploadAsync} from 'expo-file-system/legacy';
 
 let authToken = null;
 export function setToken(t) { authToken = t; }
+export function getToken() { return authToken; }
+function base64Url(value) {
+  const binary = unescape(encodeURIComponent(String(value || '')));
+  return globalThis.btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+export function liveSocketConfig(token) {
+  const accessToken = token || authToken;
+  if (!accessToken) throw new Error('Sign in before starting Live voice.');
+  return {
+    url: config.API_BASE.replace(/^http/i, 'ws').replace(/\/+$/, '') + '/api/ai/live',
+    protocols: ['ozira-live', 'ozira-token.' + base64Url(accessToken)],
+  };
+}
 let deviceId = null;
 async function getDeviceId() {
   if (deviceId) return deviceId;
@@ -43,30 +57,40 @@ async function req(path, { method, body, token, signal } = {}) {
   return data;
 }
 
-async function realtimeSdp(sdp, lang, token, signal) {
+async function uploadMedia(sourceValue, mimeType, name, token, signal) {
   const sessionDeviceId = await getDeviceId();
-  const res = await fetch(
-    config.API_BASE + '/api/ai/realtime?ground=1&lang=' + encodeURIComponent(lang || currentLang || 'en'),
-    {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/sdp',
-        'x-ozira-device-id': sessionDeviceId,
-        'x-ozira-device-label': 'OZIRA Mobile · ' + (Platform.OS === 'ios' ? 'iPhone/iPad' : 'Android'),
-        ...((token || authToken) ? { authorization: 'Bearer ' + (token || authToken) } : {}),
-      },
-      body: sdp,
-      signal,
-    },
-  );
-  const raw = await res.text();
-  if (!res.ok) {
-    let message = raw;
-    try { message = JSON.parse(raw).error || message; } catch (_) {}
-    throw new Error(message || ('Realtime connection failed (' + res.status + ')'));
+  const accessToken = token || authToken;
+  if (!accessToken) throw new Error('Sign in before uploading media.');
+  const url = config.API_BASE + '/api/ai/upload?name=' + encodeURIComponent(name || 'media');
+  const headers = {
+    'content-type': mimeType,
+    authorization: 'Bearer ' + accessToken,
+    'x-ozira-device-id': sessionDeviceId,
+    'x-ozira-device-label': 'OZIRA Mobile · ' + (Platform.OS === 'ios' ? 'iPhone/iPad' : Platform.OS === 'web' ? 'Web' : 'Android'),
+  };
+  let status;
+  let raw;
+  if (Platform.OS === 'web') {
+    // Expo pickers expose the browser File on web. Passing it directly lets the
+    // browser stream large videos to fetch without first base64-encoding them or
+    // copying the whole payload through JavaScript-managed memory.
+    let body = sourceValue;
+    if (!(typeof Blob !== 'undefined' && sourceValue instanceof Blob)) {
+      const source = await fetch(sourceValue, {signal});
+      body = await source.blob();
+    }
+    const response = await fetch(url, {method: 'POST', headers, body, signal});
+    status = response.status; raw = await response.text();
+  } else {
+    const response = await uploadAsync(url, sourceValue, {httpMethod: 'POST', uploadType: FileSystemUploadType.BINARY_CONTENT, headers});
+    status = response.status; raw = response.body;
   }
-  if (!/^v=0/m.test(raw)) throw new Error('Realtime service returned an invalid connection answer.');
-  return raw;
+  let data = {};
+  try { data = raw ? JSON.parse(raw) : {}; } catch (_) {}
+  if (status < 200 || status >= 300) {
+    const error = new Error(data.error || `Upload failed (${status})`); error.code = data.code; throw error;
+  }
+  return data;
 }
 
 export function absUrl(u) {
@@ -111,7 +135,12 @@ export const api = {
   aiResearch: (query, token, signal) => req('/api/ai/research', { body: { query }, token, signal }),
   aiTranscribe: (audio, mimeType, token) => req('/api/ai/transcribe', { body: { audio, mimeType, lang: currentLang }, token }),
   aiSpeak: (text, token, voice) => req('/api/ai/speak', { body: { text, voice, lang: currentLang }, token }),
-  aiRealtime: (sdp, lang, token, signal) => realtimeSdp(sdp, lang, token, signal),
+  aiImage: (payload, token, signal) => req('/api/ai/image', {body: payload, token, signal}),
+  aiImageEdit: (payload, token, signal) => req('/api/ai/image/edit', {body: payload, token, signal}),
+  aiVideo: (payload, token, signal) => req('/api/ai/video', {body: payload, token, signal}),
+  aiVideoJob: (jobId, token, signal) => req('/api/ai/video/' + encodeURIComponent(jobId), {token, signal}),
+  aiUpload: (uri, mimeType, name, token, signal) => uploadMedia(uri, mimeType, name, token, signal),
+  liveSocketConfig,
   // --- teams ---
   team: (token) => req('/api/team', { token }),
   teamCreate: (name, token) => req('/api/team/create', { body: { name }, token }),
