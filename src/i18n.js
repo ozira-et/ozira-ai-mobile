@@ -58,7 +58,7 @@ const T = {
     menuWorkspace: 'Workspace', menuTools: 'Tools', menuAccount: 'Account',
     mPlansSub: 'Your plan and upgrades', mUsage: 'Usage & Storage', mUsageSub: 'Limits and space used', mLibrary: 'Library',
     mLibrarySub: 'Your generated images', mDev: 'API & Developer', mDevSub: 'API keys and credits', mConnectors: 'Connectors',
-    mConnectorsSub: 'Telegram, Drive, Gmail…', mSchedules: 'Scheduled tasks', mSchedulesSub: 'Daily automatic AI tasks', mTeam: 'Team',
+    mConnectorsSub: 'Telegram, Drive, Gmail…', mIntelligence: 'Intelligence', mIntelligenceSub: 'Signals for you or your team', mSchedules: 'Scheduled tasks', mSchedulesSub: 'Daily automatic AI tasks', mTeam: 'Team',
     mTeamSub: 'Share a plan with your team', mImport: 'Import chats', mImportSub: 'From ChatGPT, Claude, Gemini', mAccount: 'Account',
     mAccountSub: 'Profile and usage', mSettings: 'Settings', mSettingsSub: 'Theme, legal, about', settings: 'Settings',
     appearance: 'Appearance', theme: 'Theme', light: 'Light', dark: 'Dark',

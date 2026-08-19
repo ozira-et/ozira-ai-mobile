@@ -23,6 +23,7 @@ const GROUPS = [
     { key: 'mConnectors', icon: 'git-network', tone: 'secondary', route: 'Connectors' },
     { key: 'mImport', icon: 'download', tone: 'gold', route: 'Import' },
     { key: 'mDev', icon: 'code-slash', tone: 'success', route: 'Developer' },
+    { key: 'mIntelligence', icon: 'analytics', tone: 'primary', route: 'Intelligence' },
   ] },
   { title: 'menuAccount', items: [
     { key: 'mPlans', icon: 'pricetag', tone: 'gold', route: 'Plans' },
