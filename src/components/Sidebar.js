@@ -14,7 +14,7 @@ import { useLang } from '../context/LanguageContext';
 import { rtlText, rtlRow, rtlIcon } from '../i18n';
 import Logo from './Logo';
 import { navigate } from '../navigation/navigationRef';
-import { listConversations, listFolders, createFolder, deleteFolder, deleteConversation, setConversationFolder, setConversationMeta, newId, getProfile } from '../localStore';
+import { listConversations, listFolders, createFolder, deleteFolder, deleteConversation, setConversationFolder, setConversationMeta, searchConversations, newId, getProfile } from '../localStore';
 import { zodiacFor } from '../zodiac';
 
 const WIDTH = Math.min(320, Dimensions.get('window').width * 0.84);
@@ -44,6 +44,13 @@ export default function Sidebar() {
   const [folderName, setFolderName] = useState('');
   const [moveConv, setMoveConv] = useState(null);
   const [profile, setProfileState] = useState({});
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState(null); // null = no search run yet
+  const [searching, setSearching] = useState(false);
+  const searchTimer = useRef(null);
+  const [renameConv, setRenameConv] = useState(null);
+  const [renameTitle, setRenameTitle] = useState('');
 
   // A real curtain-like drawer: the user can pull it closed and release at
   // any position. Small drags spring back; a decisive drag completes the close.
@@ -93,6 +100,31 @@ export default function Sidebar() {
   // reload is needed.
   useEffect(() => { if (sidebarOpen) refresh(); }, [sidebarOpen, refresh]);
 
+  // Global "search chats" — always hits the network (a stale local result
+  // list would be actively misleading for a search action), debounced so
+  // every keystroke doesn't fire a request.
+  useEffect(() => {
+    if (!searchOpen) return;
+    const q = searchQuery.trim();
+    if (!q) { setSearchResults(null); setSearching(false); return; }
+    setSearching(true);
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(async () => {
+      try { setSearchResults(await searchConversations(q)); }
+      catch (_) { setSearchResults([]); }
+      setSearching(false);
+    }, 300);
+    return () => clearTimeout(searchTimer.current);
+  }, [searchQuery, searchOpen]);
+
+  function toggleSearch() {
+    setSearchOpen(o => {
+      const next = !o;
+      if (!next) { setSearchQuery(''); setSearchResults(null); }
+      return next;
+    });
+  }
+
   function go(route, params) { navigate(route, params); closeSidebar(); }
   function newChat() { go('ChatConversation', { conversationId: newId(), title: 'New Chat' }); }
   function openChat(c) { go('ChatConversation', { conversationId: c.id, title: c.title }); }
@@ -111,6 +143,7 @@ export default function Sidebar() {
   }
   function onLongConv(c) {
     Alert.alert(c.title || 'Chat', undefined, [
+      { text: t('rename'), onPress: () => { setRenameTitle(c.title || ''); setRenameConv(c); } },
       { text: c.pinned ? 'Unpin' : 'Pin', onPress: async () => { await setConversationMeta(c.id, { pinned: !c.pinned }); refresh(); } },
       { text: c.archived ? 'Unarchive' : 'Archive', onPress: async () => { await setConversationMeta(c.id, { archived: !c.archived }); refresh(); } },
       folders.length ? { text: 'Move to folder…', onPress: () => setMoveConv(c) } : null,
@@ -120,6 +153,13 @@ export default function Sidebar() {
   }
   async function moveTo(folderId) {
     if (moveConv) { await setConversationFolder(moveConv.id, folderId); setMoveConv(null); refresh(); }
+  }
+  async function commitRename() {
+    const title = renameTitle.trim();
+    if (!title || !renameConv) { setRenameConv(null); return; }
+    await setConversationMeta(renameConv.id, { title });
+    setRenameConv(null);
+    refresh();
   }
 
   // Gender comes from sign-up; it may live on the local profile or in the
@@ -156,37 +196,109 @@ export default function Sidebar() {
           </Pressable>
         </View>
 
-        <Pressable onPress={newChat} style={styles.newChat}>
-          <Ionicons name="create-outline" size={18} color={RED} />
-          <Text style={styles.newChatTxt}>{t('newChat')}</Text>
-        </Pressable>
+        <View style={[styles.topActions, rtlRow(rtl)]}>
+          <Pressable onPress={newChat} style={[styles.newChat, { flex: 1 }]}>
+            <Ionicons name="create-outline" size={18} color={RED} />
+            <Text style={styles.newChatTxt}>{t('newChat')}</Text>
+          </Pressable>
+          <Pressable
+            onPress={toggleSearch}
+            style={[styles.searchToggle, searchOpen && styles.searchToggleOn]}
+            accessibilityRole="button"
+            accessibilityLabel={t('search')}
+          >
+            <Ionicons name={searchOpen ? 'close' : 'search'} size={18} color={ON} />
+          </Pressable>
+        </View>
+
+        {searchOpen ? (
+          <View style={[styles.searchRow, rtlRow(rtl)]}>
+            <Ionicons name="search" size={15} color={DIM} />
+            <TextInput
+              style={[styles.searchInput, rtlText(rtl)]}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder={t('searchPlaceholder')}
+              placeholderTextColor={DIM}
+              autoFocus
+              accessibilityLabel={t('search')}
+            />
+          </View>
+        ) : null}
 
         <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, marginTop: 6 }}>
-          <View style={styles.sectionRow}>
-            <Text style={[styles.section, rtlText(rtl)]}>{t('folders')}</Text>
-            <Pressable onPress={() => setCreateOpen(true)} hitSlop={8}><Ionicons name="add-circle-outline" size={20} color={ON} /></Pressable>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
-            <Pressable onPress={() => setActiveFolder(null)} style={[styles.chip, !activeFolder && styles.chipOn]}>
-              <Text style={styles.chipTxt}>{t('all')}</Text>
-            </Pressable>
-            {folders.map(f => (
-              <Pressable key={f.id} onPress={() => setActiveFolder(f.id)} onLongPress={() => removeFolder(f)} style={[styles.chip, activeFolder === f.id && styles.chipOn]}>
-                <Ionicons name="folder" size={12} color={ON} />
-                <Text style={styles.chipTxt}>{f.name}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
+          {searchOpen ? (
+            <>
+              <Text style={[styles.section, rtlText(rtl)]}>{t('search')}</Text>
+              {searching ? (
+                <Text style={[styles.empty, rtlText(rtl)]}>…</Text>
+              ) : !searchQuery.trim() ? null : (searchResults || []).length === 0 ? (
+                <Text style={[styles.empty, rtlText(rtl)]}>{t('searchNoResults')}</Text>
+              ) : (searchResults || []).map(c => (
+                <Pressable key={c.id} onPress={() => openChat(c)} onLongPress={() => onLongConv(c)} style={[styles.row, rtlRow(rtl)]}>
+                  <Ionicons name={c.pinned ? 'bookmark' : 'chatbubble-ellipses-outline'} size={18} color={ON} />
+                  <Text style={[styles.rowTxt, rtlText(rtl)]} numberOfLines={1}>{c.title || 'New chat'}</Text>
+                </Pressable>
+              ))}
+            </>
+          ) : (
+            <>
+              <View style={styles.sectionRow}>
+                <Text style={[styles.section, rtlText(rtl)]}>{t('folders')}</Text>
+                <Pressable onPress={() => setCreateOpen(true)} hitSlop={8}><Ionicons name="add-circle-outline" size={20} color={ON} /></Pressable>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
+                <Pressable onPress={() => setActiveFolder(null)} style={[styles.chip, !activeFolder && styles.chipOn]}>
+                  <Text style={styles.chipTxt}>{t('all')}</Text>
+                </Pressable>
+                <Pressable onPress={() => setActiveFolder('__archived')} style={[styles.chip, activeFolder === '__archived' && styles.chipOn]}>
+                  <Ionicons name="archive" size={12} color={ON} />
+                  <Text style={styles.chipTxt}>{t('archived')}</Text>
+                </Pressable>
+                {folders.map(f => (
+                  <Pressable key={f.id} onPress={() => setActiveFolder(f.id)} onLongPress={() => removeFolder(f)} style={[styles.chip, activeFolder === f.id && styles.chipOn]}>
+                    <Ionicons name="folder" size={12} color={ON} />
+                    <Text style={styles.chipTxt}>{f.name}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
 
-          <Text style={[styles.section, rtlText(rtl), { marginTop: 16 }]}>{t('chats')}</Text>
-          {convs.length === 0 ? (
-            <Text style={[styles.empty, rtlText(rtl)]}>{t('noChats')}</Text>
-          ) : convs.map(c => (
-            <Pressable key={c.id} onPress={() => openChat(c)} onLongPress={() => onLongConv(c)} style={[styles.row, rtlRow(rtl)]}>
-              <Ionicons name={c.pinned ? 'bookmark' : 'chatbubble-ellipses-outline'} size={18} color={ON} />
-              <Text style={[styles.rowTxt, rtlText(rtl)]} numberOfLines={1}>{c.title || 'New chat'}</Text>
-            </Pressable>
-          ))}
+              {!activeFolder ? (
+                <>
+                  <Text style={[styles.section, rtlText(rtl), { marginTop: 16 }]}>{t('pinned')}</Text>
+                  {convs.filter(c => c.pinned).length === 0 ? (
+                    <Text style={[styles.empty, rtlText(rtl)]}>{t('noChats')}</Text>
+                  ) : convs.filter(c => c.pinned).map(c => (
+                    <Pressable key={c.id} onPress={() => openChat(c)} onLongPress={() => onLongConv(c)} style={[styles.row, rtlRow(rtl)]}>
+                      <Ionicons name="bookmark" size={18} color={ON} />
+                      <Text style={[styles.rowTxt, rtlText(rtl)]} numberOfLines={1}>{c.title || 'New chat'}</Text>
+                    </Pressable>
+                  ))}
+                  <Text style={[styles.section, rtlText(rtl), { marginTop: 16 }]}>{t('recent')}</Text>
+                  {convs.filter(c => !c.pinned).length === 0 ? (
+                    <Text style={[styles.empty, rtlText(rtl)]}>{t('noChats')}</Text>
+                  ) : convs.filter(c => !c.pinned).map(c => (
+                    <Pressable key={c.id} onPress={() => openChat(c)} onLongPress={() => onLongConv(c)} style={[styles.row, rtlRow(rtl)]}>
+                      <Ionicons name="chatbubble-ellipses-outline" size={18} color={ON} />
+                      <Text style={[styles.rowTxt, rtlText(rtl)]} numberOfLines={1}>{c.title || 'New chat'}</Text>
+                    </Pressable>
+                  ))}
+                </>
+              ) : (
+                <>
+                  <Text style={[styles.section, rtlText(rtl), { marginTop: 16 }]}>{activeFolder === '__archived' ? t('archived') : t('chats')}</Text>
+                  {convs.length === 0 ? (
+                    <Text style={[styles.empty, rtlText(rtl)]}>{t('noChats')}</Text>
+                  ) : convs.map(c => (
+                    <Pressable key={c.id} onPress={() => openChat(c)} onLongPress={() => onLongConv(c)} style={[styles.row, rtlRow(rtl)]}>
+                      <Ionicons name={c.pinned ? 'bookmark' : 'chatbubble-ellipses-outline'} size={18} color={ON} />
+                      <Text style={[styles.rowTxt, rtlText(rtl)]} numberOfLines={1}>{c.title || 'New chat'}</Text>
+                    </Pressable>
+                  ))}
+                </>
+              )}
+            </>
+          )}
         </ScrollView>
 
         <Pressable style={styles.upgrade} onPress={() => go('Plans')}>
@@ -227,6 +339,25 @@ export default function Sidebar() {
           </View>
         </Pressable>
       </Modal>
+
+      <Modal visible={!!renameConv} transparent animationType="fade" onRequestClose={() => setRenameConv(null)}>
+        <Pressable style={styles.modalBg} onPress={() => setRenameConv(null)}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>{t('renameChat')}</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={renameTitle}
+              onChangeText={setRenameTitle}
+              placeholder={t('renamePlaceholder')}
+              placeholderTextColor={colors.muted}
+              autoFocus
+              onSubmitEditing={commitRename}
+              accessibilityLabel={t('renameChat')}
+            />
+            <Pressable style={styles.modalBtn} onPress={commitRename}><Text style={styles.modalBtnTxt}>{t('rename')}</Text></Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -242,8 +373,15 @@ const makeStyles = (colors) => StyleSheet.create({
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
   logoDot: { width: 32, height: 32, borderRadius: 16, backgroundColor: ON, alignItems: 'center', justifyContent: 'center' },
   brand: { color: ON, fontFamily: fonts.bold, fontSize: 18 },
-  newChat: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: ON, borderRadius: 999, paddingVertical: 11, marginTop: 12 },
+  topActions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
+  newChat: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: ON, borderRadius: 999, paddingVertical: 11 },
   newChatTxt: { color: RED, fontFamily: fonts.semibold, fontSize: 14 },
+  // 44x44 minimum touch target, matching the mobile accessibility bar used
+  // throughout ChatConversationScreen's response actions.
+  searchToggle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: CARD, borderWidth: 1, borderColor: LINE },
+  searchToggleOn: { backgroundColor: CARD_ON },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: CARD, borderWidth: 1, borderColor: LINE, borderRadius: 12, paddingHorizontal: 12, height: 42, marginTop: 10 },
+  searchInput: { flex: 1, color: ON, fontFamily: fonts.regular, fontSize: 14.5, height: '100%' },
   sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   section: { color: DIM, fontFamily: fonts.semibold, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: CARD, borderWidth: 1, borderColor: LINE, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },

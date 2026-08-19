@@ -435,13 +435,79 @@ const IMAGE_TOOL_T = {
   },
 };
 
+// Conversation Workspace labels (search, pinned/recent/archived sections,
+// rename, response Save/bookmark, share). Kept in its own table, same
+// convention as IMAGE_TOOL_T, so every new control stays complete across all
+// eight supported languages.
+const WORKSPACE_T = {
+  en: {
+    search: 'Search', searchPlaceholder: 'Search chats…', searchNoResults: 'No matching chats',
+    pinned: 'Pinned', recent: 'Recent', archived: 'Archived',
+    rename: 'Rename', renameChat: 'Rename chat', renamePlaceholder: 'Chat name',
+    save: 'Save', unsave: 'Unsave', saved: 'Saved',
+    shareFailed: 'Could not create the share link.', linkCopied: 'Link copied',
+  },
+  am: {
+    search: 'ፈልግ', searchPlaceholder: 'ውይይቶችን ፈልግ…', searchNoResults: 'ምንም ተመሳሳይ ውይይት አልተገኘም',
+    pinned: 'የተሰኩ', recent: 'የቅርብ ጊዜ', archived: 'የተቀመጡ',
+    rename: 'ስም ቀይር', renameChat: 'የውይይት ስም ቀይር', renamePlaceholder: 'የውይይት ስም',
+    save: 'አስቀምጥ', unsave: 'ከማስቀመጥ አውጣ', saved: 'ተቀምጧል',
+    shareFailed: 'የማጋሪያ ማገናኛ መፍጠር አልተቻለም።', linkCopied: 'ማገናኛው ተቀድቷል',
+  },
+  om: {
+    search: 'Barbaadi', searchPlaceholder: 'Haasawa barbaadi…', searchNoResults: 'Haasawni walfakkaatu hin argamne',
+    pinned: 'Kaaʼame', recent: 'Dhiyoo', archived: 'Kuufame',
+    rename: 'Maqaa jijjiiri', renameChat: 'Maqaa haasawaa jijjiiri', renamePlaceholder: 'Maqaa haasawaa',
+    save: 'Olkaaʼi', unsave: 'Olkaaʼuu dhiisi', saved: 'Olkaaʼame',
+    shareFailed: 'Liinkii qoodinsaa uumuu hin dandeenye.', linkCopied: 'Liinkiin garagalfame',
+  },
+  ti: {
+    search: 'ድለ', searchPlaceholder: 'ዝርርባት ድለ…', searchNoResults: 'ዝመሳሰል ዝርርብ የለን',
+    pinned: 'ዝተሰኮ', recent: 'እዋናዊ', archived: 'ዝተቐመጠ',
+    rename: 'ስም ቀይር', renameChat: 'ስም ዝርርብ ቀይር', renamePlaceholder: 'ስም ዝርርብ',
+    save: 'ኣቐምጥ', unsave: 'ካብ ምቕማጥ ኣውጽእ', saved: 'ተቐሚጡ',
+    shareFailed: 'መላግቦ ምክፋል ክፍጠር ኣይተኻእለን።', linkCopied: 'መላግቦ ተቐዲሑ',
+  },
+  ar: {
+    search: 'بحث', searchPlaceholder: 'ابحث في المحادثات…', searchNoResults: 'لا توجد محادثات مطابقة',
+    pinned: 'مثبتة', recent: 'الأخيرة', archived: 'مؤرشفة',
+    rename: 'إعادة تسمية', renameChat: 'إعادة تسمية المحادثة', renamePlaceholder: 'اسم المحادثة',
+    save: 'حفظ', unsave: 'إلغاء الحفظ', saved: 'محفوظ',
+    shareFailed: 'تعذّر إنشاء رابط المشاركة.', linkCopied: 'تم نسخ الرابط',
+  },
+  sw: {
+    search: 'Tafuta', searchPlaceholder: 'Tafuta mazungumzo…', searchNoResults: 'Hakuna mazungumzo yanayolingana',
+    pinned: 'Yaliyobandikwa', recent: 'Ya hivi karibuni', archived: 'Yaliyohifadhiwa',
+    rename: 'Badilisha jina', renameChat: 'Badilisha jina la mazungumzo', renamePlaceholder: 'Jina la mazungumzo',
+    save: 'Hifadhi', unsave: 'Ondoa uhifadhi', saved: 'Imehifadhiwa',
+    shareFailed: 'Imeshindwa kuunda kiungo cha kushiriki.', linkCopied: 'Kiungo kimenakiliwa',
+  },
+  fr: {
+    search: 'Rechercher', searchPlaceholder: 'Rechercher des discussions…', searchNoResults: 'Aucune discussion correspondante',
+    pinned: 'Épinglées', recent: 'Récentes', archived: 'Archivées',
+    rename: 'Renommer', renameChat: 'Renommer la discussion', renamePlaceholder: 'Nom de la discussion',
+    save: 'Enregistrer', unsave: 'Retirer', saved: 'Enregistré',
+    shareFailed: 'Impossible de créer le lien de partage.', linkCopied: 'Lien copié',
+  },
+  ha: {
+    search: 'Bincike', searchPlaceholder: 'Nemo tattaunawa…', searchNoResults: 'Babu tattaunawar da ta dace',
+    pinned: 'An ɗora', recent: 'Kwanan nan', archived: 'An ajiye',
+    rename: 'Sake suna', renameChat: 'Sake sunan tattaunawa', renamePlaceholder: 'Sunan tattaunawa',
+    save: 'Ajiye', unsave: 'Cire ajiyewa', saved: 'An ajiye',
+    shareFailed: 'An kasa ƙirƙiri hanyar raba.', linkCopied: 'An kwafi hanyar haɗi',
+  },
+};
+
 export function t(lang, key, vars) {
   const dict = T[lang] || T.en;
   const imageDict = IMAGE_TOOL_T[lang] || IMAGE_TOOL_T.en;
+  const workspaceDict = WORKSPACE_T[lang] || WORKSPACE_T.en;
   let s = (dict[key] != null ? dict[key]
     : (imageDict[key] != null ? imageDict[key]
-      : (T.en[key] != null ? T.en[key]
-        : (IMAGE_TOOL_T.en[key] != null ? IMAGE_TOOL_T.en[key] : key))));
+      : (workspaceDict[key] != null ? workspaceDict[key]
+        : (T.en[key] != null ? T.en[key]
+          : (IMAGE_TOOL_T.en[key] != null ? IMAGE_TOOL_T.en[key]
+            : (WORKSPACE_T.en[key] != null ? WORKSPACE_T.en[key] : key))))));
   if (vars) for (const k in vars) s = s.replace('{' + k + '}', vars[k]);
   return s;
 }

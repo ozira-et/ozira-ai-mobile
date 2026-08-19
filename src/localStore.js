@@ -117,6 +117,40 @@ export async function listConversations(folderId, opts = {}) {
   }
 }
 
+// Full-text search across a user's own conversations (title + message
+// content, server-side, cross-tenant isolated — see lib/conversationSearch.js
+// in ozira-ai). Always hits the network: a stale/offline result list here
+// would be actively misleading for a search action.
+export async function searchConversations(query) {
+  const q = String(query || '').trim();
+  if (!q) return [];
+  const d = await api.searchConversations(q);
+  return (d.conversations || []).map(c => ({
+    id: c.id, title: c.title, folderId: c.folderId || null,
+    pinned: !!c.pinned, archived: !!c.archived, count: c.count,
+  }));
+}
+
+// Response Save = bookmark ONLY (a conversationId+messageIndex reference),
+// never OZIRA memory. Server-authoritative; nothing is cached on-device.
+export async function saveBookmark(conversationId, messageIndex) {
+  const rid = await serverId(conversationId);
+  return api.saveBookmark(rid, messageIndex);
+}
+export async function unsaveBookmark(conversationId, messageIndex) {
+  const rid = await serverId(conversationId);
+  return api.unsaveBookmark(rid, messageIndex);
+}
+export async function listBookmarkedIndexes(conversationId) {
+  try {
+    const rid = await serverId(conversationId);
+    const d = await api.listBookmarks(rid);
+    return d.messageIndexes || [];
+  } catch (_) {
+    return [];
+  }
+}
+
 // Update flags on a conversation (pinned, archived, ...).
 export async function setConversationMeta(id, patch) {
   const s = await load();

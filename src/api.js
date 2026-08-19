@@ -84,6 +84,7 @@ export const api = {
   image: (payload, token, signal) => req('/api/image', { body: payload, token, signal }),
   imageEdit: (payload, token, signal) => req('/api/image/edit', { body: payload, token, signal }),
   conversations: (folderId, token) => req('/api/conversations' + (folderId ? '?folder=' + encodeURIComponent(folderId) : ''), { token }),
+  searchConversations: (query, token) => req('/api/conversations?q=' + encodeURIComponent(query), { token }),
   getConversation: (id, token, signal) => req('/api/conversations/get', { body: { id }, token, signal }),
   saveConversation: (conv, token) => req('/api/conversations/save', { body: conv, token }),
   deleteConversation: (id, token) => req('/api/conversations/delete', { body: { id }, token }),
@@ -91,6 +92,13 @@ export const api = {
   folders: (token) => req('/api/folders', { token }),
   createFolder: (name, token) => req('/api/folders/create', { body: { name }, token }),
   deleteFolder: (id, token) => req('/api/folders/delete', { body: { id }, token }),
+  // --- share (ShareGrant: a random bearer token, never the raw resource id) ---
+  createShare: (payload, token) => req('/api/shares/create', { body: payload, token }),
+  revokeShare: (shareGrantId, token) => req('/api/shares/revoke', { body: { shareGrantId }, token }),
+  // --- bookmarks (Save = bookmark ONLY, never OZIRA memory) ---
+  saveBookmark: (conversationId, messageIndex, token) => req('/api/bookmarks/save', { body: { conversationId, messageIndex }, token }),
+  unsaveBookmark: (conversationId, messageIndex, token) => req('/api/bookmarks/unsave', { body: { conversationId, messageIndex }, token }),
+  listBookmarks: (conversationId, token) => req('/api/bookmarks/list?conversationId=' + encodeURIComponent(conversationId), { token }),
   images: (token) => req('/api/images', { token }),
   deleteImage: (payload, token) => req('/api/images/delete', { body: payload, token }),
   feedback: (value, model, text, token) => req('/api/feedback', { body: { value, model, text }, token }),

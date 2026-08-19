@@ -12,6 +12,7 @@ import { useLang } from '../context/LanguageContext';
 import { rtlText, rtlRow, rtlIcon } from '../i18n';
 import { useNotify } from '../context/NotifyContext';
 import { api, absUrl } from '../api';
+import { config } from '../config';
 import Markdown from '../components/Markdown';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
@@ -19,7 +20,7 @@ import { File, Paths } from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
 import { ensurePrepared, finalizeRecording } from '../audioSession';
-import { getCachedConversation, getConversation, saveConversation, deleteConversation, setConversationMeta, setConversationFolder, listFolders, newId, getProfile } from '../localStore';
+import { getCachedConversation, getConversation, saveConversation, deleteConversation, setConversationMeta, setConversationFolder, listFolders, newId, getProfile, saveBookmark, unsaveBookmark, listBookmarkedIndexes } from '../localStore';
 import Logo from '../components/Logo';
 import FlagMenu from '../components/FlagMenu';
 import VoiceOverlay from '../components/VoiceOverlay';
@@ -125,6 +126,10 @@ export default function ChatConversationScreen({ navigation, route }) {
   const [modeOpen, setModeOpen] = useState(false);     // Model + reply-depth picker
   const [convMenu, setConvMenu] = useState(false);     // top-right ⋯ menu
   const [pinned, setPinned] = useState(false);
+  const [savedIndexes, setSavedIndexes] = useState(() => new Set()); // response Save = bookmark ONLY, never OZIRA memory
+  const [renaming, setRenaming] = useState(false);
+  const [renameTitle, setRenameTitle] = useState('');
+  const [shareBusy, setShareBusy] = useState(false);
   const [folderPick, setFolderPick] = useState(null);  // list of folders when picking
   const [reactions, setReactions] = useState({});      // index -> 1 | -1
   const [speakBusy, setSpeakBusy] = useState(null);    // index currently loading audio
@@ -294,22 +299,36 @@ export default function ChatConversationScreen({ navigation, route }) {
       // Refresh silently so changes made on web or another phone still arrive.
       showConversation(await getConversation(id));
     })();
+    setSavedIndexes(new Set());
+    listBookmarkedIndexes(id).then(indexes => { if (active) setSavedIndexes(new Set(indexes)); });
     return () => { active = false; };
   }, [route.params?.conversationId]);
 
   // ---- conversation actions (top-right ⋯ menu) ----
   function resetChat() {
     const id = newId();
-    setConvId(id); setMessages([]); setPinned(false); setReactions({});
+    setConvId(id); setMessages([]); setPinned(false); setReactions({}); setSavedIndexes(new Set());
     navigation.setParams({ conversationId: id, title: 'New Chat' });
   }
-  function transcript() {
-    return messages.map(m => (m.role === 'user' ? 'You: ' : 'OZIRA: ') + (typeof m.content === 'string' ? m.content : '[image]')).join('\n\n');
+  // Secure ShareGrant link (a random bearer token, never the raw conversation
+  // id) -- see lib/shareGrants.js in ozira-ai. Opens the OS share sheet with
+  // the resolve link, same contract apps/web uses.
+  async function shareViaGrant(resourceType, messageIndex) {
+    if (shareBusy) return;
+    setShareBusy(true);
+    try {
+      const grant = await api.createShare({ resourceType, resourceId: convId, messageIndex }, token);
+      const link = config.API_BASE + '/api/shares/resolve?token=' + grant.token;
+      await Share.share({ message: link, url: link });
+    } catch (e) {
+      Alert.alert(t('notifFailed'), t('shareFailed'));
+    }
+    setShareBusy(false);
   }
   async function shareConversation() {
     setConvMenu(false);
     if (!messages.length) return Alert.alert('Nothing to share', 'Start a conversation first.');
-    try { await Share.share({ message: 'OZIRA AI chat\n\n' + transcript() }); } catch (_) {}
+    await shareViaGrant('conversation');
   }
   async function togglePin() {
     setConvMenu(false);
@@ -342,6 +361,20 @@ export default function ChatConversationScreen({ navigation, route }) {
       { text: 'Delete', style: 'destructive', onPress: async () => { await deleteConversation(convId); resetChat(); } },
     ]);
   }
+  function beginRename() {
+    setConvMenu(false);
+    setRenameTitle(route.params?.title || '');
+    setRenaming(true);
+  }
+  // An explicit rename locks the title server-side so a later auto-title save
+  // never silently overwrites it — see server.js POST /api/conversations/meta.
+  async function commitRename() {
+    const title = renameTitle.trim();
+    setRenaming(false);
+    if (!title) return;
+    await setConversationMeta(convId, { title });
+    navigation.setParams({ title });
+  }
 
   // ---- per-message actions ----
   async function copyMsg(m, index) {
@@ -352,8 +385,32 @@ export default function ChatConversationScreen({ navigation, route }) {
       copiedTimerRef.current = setTimeout(() => setCopiedIdx(null), 1800);
     }
   }
-  async function shareMsg(m) {
+  // Response Save = bookmark ONLY (a conversationId+messageIndex reference).
+  // It never copies message content, never enters model context, and is
+  // never OZIRA memory -- see lib/messageBookmarks.js in ozira-ai. Optimistic
+  // toggle with rollback on failure, matching the like/dislike pattern above.
+  async function toggleSave(i) {
+    const wasSaved = savedIndexes.has(i);
+    setSavedIndexes(prev => {
+      const next = new Set(prev);
+      if (wasSaved) next.delete(i); else next.add(i);
+      return next;
+    });
+    try {
+      if (wasSaved) await unsaveBookmark(convId, i);
+      else await saveBookmark(convId, i);
+    } catch (e) {
+      setSavedIndexes(prev => {
+        const next = new Set(prev);
+        if (wasSaved) next.add(i); else next.delete(i);
+        return next;
+      });
+      notify(t('notifFailed'), e.message, 'error');
+    }
+  }
+  async function shareMsg(m, index) {
     if (m.image) return shareGeneratedImage(m.image);
+    if (index != null) return shareViaGrant('response', index);
     try { await Share.share({ message: typeof m.content === 'string' ? m.content : '' }); } catch (_) {}
   }
   async function shareGeneratedImage(uri) {
@@ -712,7 +769,10 @@ export default function ChatConversationScreen({ navigation, route }) {
                     <Pressable onPress={() => react(i, m, -1)} style={({ pressed }) => [styles.assistantActBtn, m.reaction === -1 && styles.assistantActSelected, pressed && styles.assistantActPressed]} accessibilityRole="button" accessibilityLabel="Bad response" accessibilityState={{ selected: m.reaction === -1 }}>
                       <AssistantActionIcon name="dislike" size={18} color={m.reaction === -1 ? colors.text : colors.muted} />
                     </Pressable>
-                    <Pressable onPress={() => shareMsg(m)} style={({ pressed }) => [styles.assistantActBtn, pressed && styles.assistantActPressed]} accessibilityRole="button" accessibilityLabel="Share">
+                    <Pressable onPress={() => toggleSave(i)} style={({ pressed }) => [styles.assistantActBtn, savedIndexes.has(i) && styles.assistantActSelected, pressed && styles.assistantActPressed]} accessibilityRole="button" accessibilityLabel={savedIndexes.has(i) ? t('unsave') : t('save')} accessibilityState={{ selected: savedIndexes.has(i) }}>
+                      <AssistantActionIcon name="save" filled={savedIndexes.has(i)} size={18} color={savedIndexes.has(i) ? colors.text : colors.muted} />
+                    </Pressable>
+                    <Pressable onPress={() => shareMsg(m, i)} style={({ pressed }) => [styles.assistantActBtn, pressed && styles.assistantActPressed]} accessibilityRole="button" accessibilityLabel="Share">
                       <AssistantActionIcon name="share" size={18} color={colors.muted} />
                     </Pressable>
                     <Pressable onPress={(event) => openAssistantActions(i, m, event)} style={({ pressed }) => [styles.assistantActBtn, pressed && styles.assistantActPressed]} accessibilityRole="button" accessibilityLabel="More">
@@ -814,6 +874,10 @@ export default function ChatConversationScreen({ navigation, route }) {
         <Pressable style={styles.convMenuBg} onPress={() => setConvMenu(false)}>
           <View style={[styles.convMenu, { marginTop: insets.top + 44 }]}>
             <Text style={styles.convHeader}>Conversation options</Text>
+            <Pressable style={({ pressed }) => [styles.convItem, pressed && styles.convItemPressed]} onPress={beginRename}>
+              <Ionicons name="pencil-outline" size={18} color={colors.primary} />
+              <Text style={styles.convItemTxt}>{t('rename')}</Text>
+            </Pressable>
             <Pressable style={({ pressed }) => [styles.convItem, pressed && styles.convItemPressed]} onPress={shareConversation}>
               <Ionicons name="share-social-outline" size={18} color={colors.primary} />
               <Text style={styles.convItemTxt}>Share</Text>
@@ -898,6 +962,27 @@ export default function ChatConversationScreen({ navigation, route }) {
             <Pressable style={styles.convItem} onPress={() => pickFolder(null)}>
               <Ionicons name="remove-circle-outline" size={18} color={colors.muted} />
               <Text style={[styles.convItemTxt, { color: colors.muted }]}>No project</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={renaming} transparent animationType="fade" onRequestClose={() => setRenaming(false)}>
+        <Pressable style={styles.convMenuBg} onPress={() => setRenaming(false)}>
+          <View style={[styles.convMenu, { marginTop: insets.top + 44, paddingHorizontal: 15, paddingBottom: 14 }]}>
+            <Text style={styles.convHeader}>{t('renameChat')}</Text>
+            <TextInput
+              style={styles.renameInput}
+              value={renameTitle}
+              onChangeText={setRenameTitle}
+              placeholder={t('renamePlaceholder')}
+              placeholderTextColor={colors.muted}
+              autoFocus
+              onSubmitEditing={commitRename}
+              accessibilityLabel={t('renameChat')}
+            />
+            <Pressable style={styles.renameBtn} onPress={commitRename}>
+              <Text style={styles.renameBtnTxt}>{t('rename')}</Text>
             </Pressable>
           </View>
         </Pressable>
@@ -1060,6 +1145,9 @@ const makeStyles = (colors) => StyleSheet.create({
   convItemPressed: { backgroundColor: colors.primary + '12' },
   convItemTxt: { color: colors.text, fontFamily: fonts.medium, fontSize: 14.5 },
   convDivider: { height: 1, backgroundColor: colors.border, marginVertical: 4 },
+  renameInput: { backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, height: 44, color: colors.text, fontFamily: fonts.regular, fontSize: 15, marginTop: 4, marginBottom: 10 },
+  renameBtn: { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
+  renameBtnTxt: { color: colors.white, fontFamily: fonts.semibold, fontSize: 14 },
   empty: { marginTop: 18, gap: 18 },
   hero: {
     backgroundColor: '#250914', borderRadius: 26, overflow: 'hidden',

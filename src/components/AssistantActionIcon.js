@@ -3,7 +3,7 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 // A deliberately small monochrome outline set for the assistant action row.
 // Every glyph shares ChatGPT's rounded 1.8px visual weight.
-export default function AssistantActionIcon({ name, color, size = 18, strokeWidth = 1.7 }) {
+export default function AssistantActionIcon({ name, color, size = 18, strokeWidth = 1.7, filled = false }) {
   const common = {
     fill: 'none',
     stroke: color,
@@ -34,6 +34,7 @@ export default function AssistantActionIcon({ name, color, size = 18, strokeWidt
         <Path d="m7.5 13.5 3.5 5.7c.7 1.1 2.4.6 2.3-.7l-.4-4h5.2a2 2 0 0 0 2-2.4l-1.2-6a2 2 0 0 0-2-1.6H7.5v9Z" {...common} />
         <Path d="M3.5 4.5h4v9h-4Z" {...common} />
       </>}
+      {name === 'save' && <Path d="M7 4.5h10a1 1 0 0 1 1 1V20l-6-4-6 4V5.5a1 1 0 0 1 1-1Z" {...common} fill={filled ? color : 'none'} />}
       {name === 'share' && <>
         <Path d="M12 16V4M7.5 8.5 12 4l4.5 4.5" {...common} />
         <Path d="M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5" {...common} />
