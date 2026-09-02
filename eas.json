@@ -17,6 +17,17 @@
         "buildType": "apk"
       }
     },
+    "staging": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_OZIRA_ENV": "staging",
+        "EXPO_PUBLIC_OZIRA_API_BASE": "https://ozira-ai-staging-staging.up.railway.app",
+        "EXPO_PUBLIC_OZIRA_SUPABASE_URL": "https://gdydxlmidnshluvpynml.supabase.co"
+      }
+    },
     "production": {}
   }
 }
