@@ -7,6 +7,7 @@
 // not a monorepo restructuring). Without this, Metro reports the shared
 // package as unresolvable even though it is physically present via the
 // symlink.
+const fs = require('node:fs');
 const path = require('node:path');
 const { getDefaultConfig } = require('expo/metro-config');
 
@@ -18,11 +19,18 @@ config.resolver.unstable_enableSymlinks = true;
 // ozira-app-core's own internal `require('../../ozira-contracts')` needs
 // ozira-contracts watched too, not just ozira-app-core itself.
 const OZIRA_AI_PACKAGES = path.resolve(__dirname, '..', 'ozira-ai', 'packages');
-config.watchFolders = [...(config.watchFolders || []), OZIRA_AI_PACKAGES];
+const localAppCore = path.join(OZIRA_AI_PACKAGES, 'ozira-app-core');
+const localContracts = path.join(OZIRA_AI_PACKAGES, 'ozira-contracts');
+const hasLocalPackages = fs.existsSync(localAppCore) && fs.existsSync(localContracts);
+const packagedAppCore = path.dirname(require.resolve('ozira-app-core/package.json'));
+const packagedContracts = path.dirname(require.resolve('ozira-contracts/package.json'));
+config.watchFolders = hasLocalPackages
+  ? [...(config.watchFolders || []), OZIRA_AI_PACKAGES]
+  : (config.watchFolders || []);
 config.resolver.extraNodeModules = {
   ...(config.resolver.extraNodeModules || {}),
-  'ozira-app-core': path.join(OZIRA_AI_PACKAGES, 'ozira-app-core'),
-  'ozira-contracts': path.join(OZIRA_AI_PACKAGES, 'ozira-contracts'),
+  'ozira-app-core': hasLocalPackages ? localAppCore : packagedAppCore,
+  'ozira-contracts': hasLocalPackages ? localContracts : packagedContracts,
 };
 
 module.exports = config;
