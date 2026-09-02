@@ -38,6 +38,7 @@ async function req(path, { method, body, token, signal } = {}) {
   if (!res.ok) {
     const err = new Error(data.error || ('Request failed (' + res.status + ')'));
     err.code = data.code;
+    err.status = res.status;
     throw err;
   }
   return data;
@@ -81,6 +82,13 @@ export const api = {
   telegramLinkCode: (token) => req('/api/telegram/link-code', { body: {}, token }),
   plans: () => req('/api/plans'),
   chat: (payload, token, signal) => req('/api/chat', { body: payload, token, signal }),
+  // Persistent Assistant runs are owned by OZIRA's backend. Mobile only
+  // carries the authenticated token and the canonical run identifiers.
+  createRun: (payload, token) => req('/api/runs', { body: payload, token }),
+  getRun: (runId, token) => req('/api/runs/get', { body: { runId }, token }),
+  discoverRun: (conversationId, token) => req('/api/runs/discover', { body: { conversationId }, token }),
+  updateRun: (runId, payload, token) => req('/api/runs/update', { body: { runId, ...payload }, token }),
+  resumeRun: (runId, token) => req('/api/runs/resume', { body: { runId }, token }),
   image: (payload, token, signal) => req('/api/image', { body: payload, token, signal }),
   imageEdit: (payload, token, signal) => req('/api/image/edit', { body: payload, token, signal }),
   conversations: (folderId, token) => req('/api/conversations' + (folderId ? '?folder=' + encodeURIComponent(folderId) : ''), { token }),
