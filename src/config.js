@@ -12,6 +12,7 @@ if (isStaging && (!apiBase || !supabaseUrl || !supabaseAnonKey)) {
 }
 
 export const config = {
+  IS_STAGING: isStaging,
   // Your deployed OZIRA backend (change to your custom domain when ready)
   API_BASE: apiBase,
 

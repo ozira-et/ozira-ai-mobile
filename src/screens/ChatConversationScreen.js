@@ -702,7 +702,7 @@ export default function ChatConversationScreen({ navigation, route }) {
         </Pressable>
       </View>
 
-      {__DEV__ && continuityDiagnostic?.runId && (
+      {config.IS_STAGING && continuityDiagnostic?.runId && (
         <View
           accessibilityLabel="Staging continuity diagnostic"
           style={{ marginHorizontal: 16, marginTop: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}
