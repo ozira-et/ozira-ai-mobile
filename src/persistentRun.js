@@ -93,6 +93,13 @@ export async function getPersistentRun({ ownerId, conversationId, token } = {}) 
     if (discovered?.run?.runId) {
       state.runs[conversationKey] = { runId: discovered.run.runId };
       await save();
+      if (typeof __DEV__ !== 'undefined' && __DEV__) {
+        console.info('[OZIRA Phase1B] server run discovery', {
+          conversationId: conversationKey,
+          runId: discovered.run.runId,
+          stateVersion: Number(discovered.run.stateVersion),
+        });
+      }
       return discovered.run;
     }
   } catch (_) {

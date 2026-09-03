@@ -187,7 +187,7 @@ export async function getConversation(id) {
 
 export async function saveConversation(conv) {
   const s = await load();
-  if (s.settings && s.settings.saveHistory === false) return; // history saving turned off
+  if (s.settings && s.settings.saveHistory === false) return null; // history saving turned off
   const now = Date.now();
   const existing = s.conversations[conv.id];
   s.conversations[conv.id] = {
@@ -206,8 +206,12 @@ export async function saveConversation(conv) {
       title: conv.title,
       messages: conv.messages || [],
     });
-    if (d && d.id) await linkId(conv.id, d.id);
+    if (d && d.id) {
+      await linkId(conv.id, d.id);
+      return { id: d.id, title: d.title || conv.title };
+    }
   } catch (_) { /* stays in the cache; the next save retries */ }
+  return null;
 }
 
 export async function deleteConversation(id) {

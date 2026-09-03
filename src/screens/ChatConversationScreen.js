@@ -21,6 +21,7 @@ import * as MediaLibrary from 'expo-media-library';
 import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
 import { ensurePrepared, finalizeRecording } from '../audioSession';
 import { getCachedConversation, getConversation, saveConversation, deleteConversation, setConversationMeta, setConversationFolder, listFolders, newId, getProfile, saveBookmark, unsaveBookmark, listBookmarkedIndexes } from '../localStore';
+import { getPersistentRun, createOrResolveRun, updatePersistentRun } from '../persistentRun';
 import Logo from '../components/Logo';
 import FlagMenu from '../components/FlagMenu';
 import VoiceOverlay from '../components/VoiceOverlay';
@@ -144,6 +145,32 @@ export default function ChatConversationScreen({ navigation, route }) {
   const [resizeImage, setResizeImage] = useState(null);
   const [savingImage, setSavingImage] = useState(false);
   const [imageSaved, setImageSaved] = useState(false);
+  const activeRunRef = useRef(null);
+
+  function setCurrentRun(run) {
+    activeRunRef.current = run || null;
+  }
+
+  async function syncPersistentRun(conversationId, objective, messageCount) {
+    if (!conversationId || !user?.id || !token) return;
+    const run = await createOrResolveRun({
+      ownerId: user.id,
+      conversationId,
+      objective,
+      token,
+    });
+    const updated = await updatePersistentRun({
+      ownerId: user.id,
+      conversationId,
+      token,
+      patch: {
+        stateVersion: Number(run.stateVersion),
+        runStatus: 'running',
+        checkpoint: { conversationId, messageCount, lastTurnAt: new Date().toISOString() },
+      },
+    });
+    setCurrentRun(updated || run);
+  }
 
   useEffect(() => { getProfile().then(p => { instrRef.current = p.customInstructions || ''; }).catch(() => {}); }, []);
   useEffect(() => () => {
@@ -298,16 +325,21 @@ export default function ChatConversationScreen({ navigation, route }) {
       showConversation(await getCachedConversation(id));
       // Refresh silently so changes made on web or another phone still arrive.
       showConversation(await getConversation(id));
+      try {
+        const run = await getPersistentRun({ ownerId: user?.id, conversationId: id, token });
+        if (active) setCurrentRun(run);
+      } catch (_) { /* run discovery is auxiliary to transcript hydration */ }
     })();
     setSavedIndexes(new Set());
     listBookmarkedIndexes(id).then(indexes => { if (active) setSavedIndexes(new Set(indexes)); });
     return () => { active = false; };
-  }, [route.params?.conversationId]);
+  }, [route.params?.conversationId, token, user?.id]);
 
   // ---- conversation actions (top-right ⋯ menu) ----
   function resetChat() {
     const id = newId();
     setConvId(id); setMessages([]); setPinned(false); setReactions({}); setSavedIndexes(new Set());
+    setCurrentRun(null);
     navigation.setParams({ conversationId: id, title: 'New Chat' });
   }
   // Secure ShareGrant link (a random bearer token, never the raw conversation
@@ -546,8 +578,11 @@ export default function ChatConversationScreen({ navigation, route }) {
       id: convId,
       title,
       messages: messages.map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content : '', image: m.image || null, imageId: m.imageId || null, thumb: m.thumb || null, model: m.model || null, reaction: m.reaction || 0 })),
-    });
-  }, [messages]);
+    }).then(saved => {
+      if (!saved?.id) return;
+      void syncPersistentRun(saved.id, title, messages.length).catch(() => {});
+    }).catch(() => {});
+  }, [messages, token, user?.id]);
 
   function scrollDown() { requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true })); }
 
