@@ -87,6 +87,7 @@ export const api = {
   createRun: (payload, token) => req('/api/runs', { body: payload, token }),
   getRun: (runId, token) => req('/api/runs/get', { body: { runId }, token }),
   discoverRun: (conversationId, token) => req('/api/runs/discover', { body: { conversationId }, token }),
+  runDiagnostic: (conversationId, token) => req('/api/runs/diagnostic', { body: { conversationId }, token }),
   updateRun: (runId, payload, token) => req('/api/runs/update', { body: { runId, ...payload }, token }),
   resumeRun: (runId, token) => req('/api/runs/resume', { body: { runId }, token }),
   image: (payload, token, signal) => req('/api/image', { body: payload, token, signal }),

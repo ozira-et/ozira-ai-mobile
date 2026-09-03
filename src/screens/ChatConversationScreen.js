@@ -145,10 +145,17 @@ export default function ChatConversationScreen({ navigation, route }) {
   const [resizeImage, setResizeImage] = useState(null);
   const [savingImage, setSavingImage] = useState(false);
   const [imageSaved, setImageSaved] = useState(false);
+  const [continuityDiagnostic, setContinuityDiagnostic] = useState(null);
   const activeRunRef = useRef(null);
 
   function setCurrentRun(run) {
     activeRunRef.current = run || null;
+    setContinuityDiagnostic(run ? {
+      conversationId: run.conversationId || null,
+      runId: run.runId || null,
+      stateVersion: run.stateVersion,
+      status: run.runStatus || null,
+    } : null);
   }
 
   async function syncPersistentRun(conversationId, objective, messageCount) {
@@ -328,6 +335,10 @@ export default function ChatConversationScreen({ navigation, route }) {
       try {
         const run = await getPersistentRun({ ownerId: user?.id, conversationId: id, token });
         if (active) setCurrentRun(run);
+        // The staging-only diagnostic is a server projection, not a local
+        // cache. It is rendered only in development builds for acceptance.
+        const diagnostic = await api.runDiagnostic(id, token);
+        if (active) setContinuityDiagnostic(diagnostic);
       } catch (_) { /* run discovery is auxiliary to transcript hydration */ }
     })();
     setSavedIndexes(new Set());
@@ -690,6 +701,17 @@ export default function ChatConversationScreen({ navigation, route }) {
           <Ionicons name="ellipsis-vertical" size={19} color={colors.primary} />
         </Pressable>
       </View>
+
+      {__DEV__ && continuityDiagnostic?.runId && (
+        <View
+          accessibilityLabel="Staging continuity diagnostic"
+          style={{ marginHorizontal: 16, marginTop: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}
+        >
+          <Text style={{ color: colors.muted, fontSize: 11 }}>
+            Staging continuity · {continuityDiagnostic.conversationId} · {continuityDiagnostic.runId} · v{continuityDiagnostic.stateVersion} · {continuityDiagnostic.status || 'unknown'}
+          </Text>
+        </View>
+      )}
 
       {modeOpen && <Pressable style={styles.modeDismiss} onPress={() => setModeOpen(false)} />}
       {modeOpen && (
