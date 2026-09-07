@@ -12,7 +12,7 @@ import { useUI } from '../context/UIContext';
 import { useNotify } from '../context/NotifyContext';
 import { config } from '../config';
 import { api } from '../api';
-import { getSettings, setSettings as saveSettings, purgeAllHistory } from '../localStore';
+import { useAccountStore } from '../useAccountStore';
 
 const VOICES = [
   { label: 'Selam', voice: 'Kore' },
@@ -22,6 +22,7 @@ const VOICES = [
 ];
 
 export default function SettingsScreen() {
+  const { getSettings, setSettings: saveSettings, purgeAllHistory } = useAccountStore();
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -44,10 +45,10 @@ export default function SettingsScreen() {
       await saveSettings(merged);
     } catch (_) { /* Offline: the local copy remains available. */ }
     setSt({ saveHistory: merged.saveHistory !== false, improveModel: !!merged.improveModel, voice: merged.voice || 'Kore', notify: merged.notify !== false });
-  })(); }, [token]);
+  })().catch(() => { /* Account changed while loading; discard the old screen's work. */ }); }, [token]);
   function update(patch) {
     setSt(prev => ({ ...prev, ...patch }));
-    saveSettings(patch);
+    saveSettings(patch).catch(() => {});
     api.saveSettings(patch, token).catch(() => {});
   }
   async function openSessions() {

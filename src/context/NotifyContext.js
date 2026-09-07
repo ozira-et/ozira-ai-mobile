@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { fonts } from '../theme';
 import { useColors } from '../context/ThemeContext';
-import { getSettings } from '../localStore';
+import { useAccountStore } from '../useAccountStore';
 
 const NotifyContext = createContext(null);
 export const useNotify = () => useContext(NotifyContext) || { notify: () => {} };
@@ -25,6 +25,7 @@ const KIND = {
 };
 
 export function NotifyProvider({ children }) {
+  const { getSettings } = useAccountStore();
   const [queue, setQueue] = useState([]);   // [{ id, title, body, kind }]
   const enabledRef = useRef(true);
   const idRef = useRef(0);

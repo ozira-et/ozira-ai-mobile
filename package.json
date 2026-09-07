@@ -7,7 +7,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "test": "jest"
+    "test": "jest",
+    "test:account-isolation": "node --experimental-vm-modules --test test/account-cache.node.mjs test/continuity-safety.node.mjs"
   },
   "dependencies": {
     "@config-plugins/react-native-webrtc": "13.0.0",

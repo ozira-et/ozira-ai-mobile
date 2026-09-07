@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { fonts, radius } from '../theme';
 import { useColors } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
-import { getProfile } from '../localStore';
+import { useAccountStore } from '../useAccountStore';
 import { zodiacFor } from '../zodiac';
 import { useLang } from '../context/LanguageContext';
 import { rtlText, rtlRow, rtlIcon } from '../i18n';
@@ -35,6 +35,7 @@ const GROUPS = [
 ];
 
 export default function MenuScreen({ navigation }) {
+  const { getProfile } = useAccountStore();
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);

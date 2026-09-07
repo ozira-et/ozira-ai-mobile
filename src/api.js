@@ -1,9 +1,9 @@
 import { config } from './config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import { setAccountSession, captureRequestToken, assertCurrentAccount } from './accountSession';
 
-let authToken = null;
-export function setToken(t) { authToken = t; }
+export function setToken(t, ownerId) { setAccountSession(t, ownerId); }
 let deviceId = null;
 async function getDeviceId() {
   if (deviceId) return deviceId;
@@ -22,19 +22,22 @@ let currentLang = 'en';
 export function setApiLang(l) { if (l) currentLang = l; }
 
 async function req(path, { method, body, token, signal } = {}) {
+  const request = captureRequestToken(token);
   const sessionDeviceId = await getDeviceId();
+  assertCurrentAccount(request.scope, false);
   const res = await fetch(config.API_BASE + path, {
     method: method || (body ? 'POST' : 'GET'),
     headers: {
       'content-type': 'application/json',
       'x-ozira-device-id': sessionDeviceId,
       'x-ozira-device-label': 'OZIRA Mobile · ' + (Platform.OS === 'ios' ? 'iPhone/iPad' : 'Android'),
-      ...((token || authToken) ? { authorization: 'Bearer ' + (token || authToken) } : {}),
+      ...(request.token ? { authorization: 'Bearer ' + request.token } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
     signal,
   });
   const data = await res.json().catch(() => ({}));
+  assertCurrentAccount(request.scope, false);
   if (!res.ok) {
     const err = new Error(data.error || ('Request failed (' + res.status + ')'));
     err.code = data.code;
@@ -45,7 +48,9 @@ async function req(path, { method, body, token, signal } = {}) {
 }
 
 async function realtimeSdp(sdp, lang, token, signal) {
+  const request = captureRequestToken(token);
   const sessionDeviceId = await getDeviceId();
+  assertCurrentAccount(request.scope, false);
   const res = await fetch(
     config.API_BASE + '/api/ai/realtime?ground=1&lang=' + encodeURIComponent(lang || currentLang || 'en'),
     {
@@ -54,13 +59,14 @@ async function realtimeSdp(sdp, lang, token, signal) {
         'content-type': 'application/sdp',
         'x-ozira-device-id': sessionDeviceId,
         'x-ozira-device-label': 'OZIRA Mobile · ' + (Platform.OS === 'ios' ? 'iPhone/iPad' : 'Android'),
-        ...((token || authToken) ? { authorization: 'Bearer ' + (token || authToken) } : {}),
+        ...(request.token ? { authorization: 'Bearer ' + request.token } : {}),
       },
       body: sdp,
       signal,
     },
   );
   const raw = await res.text();
+  assertCurrentAccount(request.scope, false);
   if (!res.ok) {
     let message = raw;
     try { message = JSON.parse(raw).error || message; } catch (_) {}

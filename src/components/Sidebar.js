@@ -13,7 +13,7 @@ import { useLang } from '../context/LanguageContext';
 import { rtlText, rtlRow, rtlIcon } from '../i18n';
 import Logo from './Logo';
 import { navigate } from '../navigation/navigationRef';
-import { listConversations, listFolders, createFolder, deleteFolder, deleteConversation, setConversationFolder, setConversationMeta, searchConversations, newId, getProfile } from '../localStore';
+import { useAccountStore } from '../useAccountStore';
 import { zodiacFor } from '../zodiac';
 
 const WIDTH = Math.min(320, Dimensions.get('window').width * 0.84);
@@ -26,6 +26,7 @@ const CARD_ON = 'rgba(255,255,255,0.22)';
 const LINE = 'rgba(255,255,255,0.18)';
 
 export default function Sidebar() {
+  const { listConversations, listFolders, createFolder, deleteFolder, deleteConversation, setConversationFolder, setConversationMeta, searchConversations, newId, getProfile } = useAccountStore();
   const { sidebarOpen, closeSidebar } = useUI();
   const insets = useSafeAreaInsets();
   const colors = useColors();

@@ -9,7 +9,7 @@ import Logo from '../components/Logo';
 import FlagMenu from '../components/FlagMenu';
 import { useAuth } from '../context/AuthContext';
 import { useUI } from '../context/UIContext';
-import { listConversations, newId, getProfile, setProfile as saveProfile } from '../localStore';
+import { useAccountStore } from '../useAccountStore';
 import { zodiacFor } from '../zodiac';
 import { ethiopianDateString } from '../ethiopianDate';
 import { api } from '../api';
@@ -20,6 +20,7 @@ const QUICK = [
 ];
 
 export default function ChatHomeScreen({ navigation }) {
+  const { listConversations, newId, getProfile, setProfile: saveProfile } = useAccountStore();
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);

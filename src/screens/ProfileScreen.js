@@ -9,12 +9,13 @@ import { useLang } from '../context/LanguageContext';
 import FlagMenu from '../components/FlagMenu';
 import { useAuth } from '../context/AuthContext';
 import { useUI } from '../context/UIContext';
-import { getProfile } from '../localStore';
+import { useAccountStore } from '../useAccountStore';
 import { zodiacFor, isValidBirthday } from '../zodiac';
 
 const INTERESTS = ['Business', 'Technology', 'Travel', 'Sports', 'Health', 'Education', 'Entertainment', 'News', 'Faith', 'Cooking', 'Fashion', 'Finance'];
 
 export default function ProfileScreen() {
+  const { getProfile } = useAccountStore();
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);

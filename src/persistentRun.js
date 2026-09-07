@@ -5,26 +5,46 @@
 // file-reference visibility.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from './api';
+import { config } from './config';
+import { captureAccountSession, assertCurrentAccount } from './accountSession';
 
 const STORAGE_KEY = 'ozira_persistent_run_links_v1';
-let cache = null;
+const states = new Map();
+const scopes = new WeakMap();
+const environment = config.SUPABASE_URL || config.API_BASE;
+const storageKey = owner => STORAGE_KEY + ':' + encodeURIComponent(environment) + ':' + encodeURIComponent(owner);
 
 async function load(ownerId) {
   const owner = String(ownerId || '');
   if (!owner) throw Object.assign(new Error('Authenticated user is required.'), { code: 'AUTH_REQUIRED', status: 401 });
-  if (!cache) {
-    try { cache = JSON.parse((await AsyncStorage.getItem(STORAGE_KEY)) || 'null'); } catch (_) { cache = null; }
-  }
-  if (!cache || cache.ownerId !== owner) {
-    cache = { ownerId: owner, runs: {} };
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(cache));
-  }
-  if (!cache.runs || typeof cache.runs !== 'object') cache.runs = {};
-  return cache;
+  const scope = captureAccountSession();
+  assertCurrentAccount(scope);
+  if (scope.ownerId !== owner) throw Object.assign(new Error('Run owner does not match session.'), { code: 'ACCOUNT_SESSION_CHANGED', status: 401 });
+  for (const generation of states.keys()) if (generation !== scope.generation) states.delete(generation);
+  if (!states.has(scope.generation)) states.set(scope.generation, (async () => {
+    let state;
+    try { state = JSON.parse(await AsyncStorage.getItem(storageKey(owner))); } catch (_) {}
+    assertCurrentAccount(scope);
+    if (!state || state.ownerId !== owner || state.environment !== environment) {
+      let legacy;
+      try { legacy = JSON.parse(await AsyncStorage.getItem(STORAGE_KEY)); } catch (_) {}
+      assertCurrentAccount(scope);
+      // v1 contains explicit ownership, but only hints; every use still reads the server.
+      state = { ownerId: owner, environment, runs: legacy?.ownerId === owner ? legacy.runs || {} : {} };
+    }
+    if (!state.runs || typeof state.runs !== 'object') state.runs = {};
+    scopes.set(state, scope);
+    return state;
+  })());
+  const state = await states.get(scope.generation);
+  assertCurrentAccount(scope);
+  return state;
 }
 
-async function save() {
-  if (cache) await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(cache));
+async function save(state) {
+  assertCurrentAccount(scopes.get(state));
+  await AsyncStorage.setItem(storageKey(state.ownerId), JSON.stringify(state));
+  assertCurrentAccount(scopes.get(state));
 }
 
 function key(conversationId) { return String(conversationId || ''); }
@@ -67,7 +87,7 @@ export async function createOrResolveRun({ ownerId, conversationId, objective, t
   const run = response.run;
   if (!run?.runId) throw Object.assign(new Error('The server did not return a Persistent Run.'), { code: 'UNKNOWN', status: 502 });
   state.runs[conversationKey] = { runId: run.runId };
-  await save();
+  await save(state);
   return run;
 }
 
@@ -83,7 +103,7 @@ export async function getPersistentRun({ ownerId, conversationId, token } = {}) 
     const discovered = await api.discoverRun(conversationKey, token);
     if (discovered?.run?.runId) {
       state.runs[conversationKey] = { runId: discovered.run.runId };
-      await save();
+      await save(state);
       if (typeof __DEV__ !== 'undefined' && __DEV__) {
         console.info('[OZIRA Phase1B] server run discovery', {
           conversationId: conversationKey,
@@ -117,7 +137,7 @@ export async function getPersistentRun({ ownerId, conversationId, token } = {}) 
     if (error.code === 'NOT_FOUND') {
       if (discoveryError) throw discoveryError;
       delete state.runs[conversationKey];
-      await save();
+      await save(state);
       return null;
     }
     throw error;
@@ -151,8 +171,10 @@ export async function updatePersistentRun({ ownerId, conversationId, token, patc
 }
 
 export async function clearPersistentRunCache() {
-  cache = null;
-  await AsyncStorage.removeItem(STORAGE_KEY);
+  const scope = captureAccountSession();
+  assertCurrentAccount(scope);
+  states.delete(scope.generation);
+  await AsyncStorage.removeItem(storageKey(scope.ownerId));
 }
 
 export { metadataReference, mergeFileReferences };

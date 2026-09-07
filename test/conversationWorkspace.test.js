@@ -67,6 +67,8 @@ describe('api.js -- new Conversation Workspace endpoints', () => {
 describe('localStore.js -- search + bookmark wrappers', () => {
   beforeEach(() => {
     jest.resetModules();
+    require('../src/accountSession').setAccountSession('synthetic-a', 'user-a');
+    jest.doMock('expo-file-system', () => ({ Paths: { document: 'test-document' }, File: class { get exists() { return false; } create() {} write() {} } }));
     jest.doMock('../src/api', () => ({
       api: {
         searchConversations: jest.fn(async () => ({ conversations: [{ id: 'cnv_9', title: 'Trip planning', count: 4 }] })),
@@ -94,9 +96,9 @@ describe('localStore.js -- search + bookmark wrappers', () => {
     const { saveBookmark, unsaveBookmark } = require('../src/localStore');
     const { api } = require('../src/api');
     await saveBookmark('cnv_1', 5);
-    expect(api.saveBookmark).toHaveBeenCalledWith('cnv_1', 5);
+    expect(api.saveBookmark).toHaveBeenCalledWith('cnv_1', 5, 'synthetic-a');
     await unsaveBookmark('cnv_1', 5);
-    expect(api.unsaveBookmark).toHaveBeenCalledWith('cnv_1', 5);
+    expect(api.unsaveBookmark).toHaveBeenCalledWith('cnv_1', 5, 'synthetic-a');
   });
 
   it('listBookmarkedIndexes returns the server\'s messageIndexes array', async () => {
@@ -106,6 +108,7 @@ describe('localStore.js -- search + bookmark wrappers', () => {
 
   it('listBookmarkedIndexes fails safe to [] rather than throwing (e.g. offline)', async () => {
     jest.resetModules();
+    require('../src/accountSession').setAccountSession('synthetic-a', 'user-a');
     jest.doMock('../src/api', () => ({
       api: { listBookmarks: jest.fn(async () => { throw new Error('network down'); }) },
     }));

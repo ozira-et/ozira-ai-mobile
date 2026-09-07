@@ -35,7 +35,12 @@ async function fixture(staging = false) {
     'react-native': { Platform: { OS: 'android' } },
   };
   const modules = new Map();
-  async function load(name) {
+  const pending = new Map();
+  function load(name) {
+    if (!pending.has(name)) pending.set(name, loadOne(name));
+    return pending.get(name);
+  }
+  async function loadOne(name) {
     if (modules.has(name)) return modules.get(name);
     const exports = mocks[name];
     const module = exports
@@ -47,6 +52,7 @@ async function fixture(staging = false) {
   }
   const runs = await load('./persistentRun');
   await runs.evaluate();
+  modules.get('./api').namespace.setToken('test-token', 'a');
   return { runs: runs.namespace, api: modules.get('./api').namespace.api, calls, offline: () => { failRead = true; }, state: () => ({ version, checkpoint }) };
 }
 

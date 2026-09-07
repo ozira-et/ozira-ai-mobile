@@ -5,6 +5,7 @@ describe('mobile Persistent Run adapter', () => {
 
   beforeEach(() => {
     jest.resetModules();
+    require('../src/accountSession').setAccountSession('tok', 'user-a');
     runs = {};
     AsyncStorage = {
       getItem: jest.fn(async () => null),
@@ -87,6 +88,7 @@ describe('mobile Persistent Run adapter', () => {
   it('does not reuse another user\'s local run mapping', async () => {
     const { createOrResolveRun } = require('../src/persistentRun');
     await createOrResolveRun({ ownerId: 'user-a', conversationId: 'c_12345678', objective: 'A', token: 'tok-a' });
+    require('../src/accountSession').setAccountSession('tok-b', 'user-b');
     await createOrResolveRun({ ownerId: 'user-b', conversationId: 'c_12345678', objective: 'B', token: 'tok-b' });
     expect(api.createRun).toHaveBeenCalledTimes(2);
     expect(api.createRun.mock.calls[1][1]).toBe('tok-b');

@@ -1,7 +1,7 @@
 // App language: the one the user picks at sign-up (or later in Settings). Drives
 // all UI text via t(), and is sent with chat requests so the AI replies in it.
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { getSettings, setSettings } from '../localStore';
+import { useAccountStore } from '../useAccountStore';
 import { t as translate, isRTL } from '../i18n';
 import { api, setApiLang } from '../api';
 import { useAuth } from './AuthContext';
@@ -10,6 +10,7 @@ const LanguageContext = createContext(null);
 export const useLang = () => useContext(LanguageContext);
 
 export function LanguageProvider({ children }) {
+  const { getSettings, setSettings } = useAccountStore();
   const { token } = useAuth();
   const [lang, setLangState] = useState('en');
 

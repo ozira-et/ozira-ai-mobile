@@ -4,10 +4,20 @@ import { createAudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { writeAsStringAsync, cacheDirectory, EncodingType } from 'expo-file-system/legacy';
 import { api } from './api';
 import { getSettings } from './localStore';
+import { captureAccountSession, assertCurrentAccount } from './accountSession';
 
 let player = null;
+let playbackSequence = 0;
+
+function assertPlayback(scope, sequence) {
+  assertCurrentAccount(scope);
+  if (sequence !== playbackSequence) {
+    throw Object.assign(new Error('Audio playback was superseded.'), { code: 'PLAYBACK_CANCELLED' });
+  }
+}
 
 export function stopSpeaking() {
+  playbackSequence += 1;
   if (player) {
     try { player.pause(); player.remove(); } catch (_) {}
     player = null;
@@ -32,36 +42,47 @@ function audioPayload(audio, response) {
 export async function speakText(text, token, onEnd) {
   const clean = (text || '').trim();
   if (!clean) return { ok: false, message: 'Nothing to read.' };
+  stopSpeaking();
+  const scope = captureAccountSession();
+  const sequence = playbackSequence;
+  try { assertPlayback(scope, sequence); } catch (e) { return { ok: false, message: e.message }; }
   let voice = 'Kore';
   let lang = 'en';
   try {
-    const s = await getSettings();
+    const s = await getSettings(scope);
+    assertPlayback(scope, sequence);
     lang = s.lang || 'en';
     // Kore/Aoede/Charon/Puck are general-provider voices. Do not send one for
     // Amharic or Afaan Oromoo: the backend must choose the native Addis voice
     // from its language-specific catalog instead of falling back to generic TTS.
     voice = (lang === 'am' || lang === 'om') ? undefined : (s.voice || 'Kore');
-  } catch (_) {}
+  } catch (e) {
+    if (e.code === 'ACCOUNT_SESSION_CHANGED' || e.code === 'PLAYBACK_CANCELLED') return { ok: false, message: e.message };
+  }
   let d;
-  try { d = await api.aiSpeak(clean.slice(0, 4000), token, voice); }
-  catch (e) { return { ok: false, message: e.message }; }
+  try {
+    assertPlayback(scope, sequence);
+    d = await api.aiSpeak(clean.slice(0, 4000), token, voice);
+    assertPlayback(scope, sequence);
+  } catch (e) { return { ok: false, message: e.message }; }
   if (!d || (!d.audio && !d.audioUrl && !d.audio_url)) return { ok: false, message: (d && (d.notice || d.error)) || 'Voice output is not available yet.' };
   try {
     // Recording mode can route output to the earpiece or suppress it on some
     // devices. Return to playback mode before creating the player.
     await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
+    assertPlayback(scope, sequence);
     let source = d.audioUrl || d.audio_url;
     if (!source) {
       const { base64, ext } = audioPayload(d.audio, d);
       source = cacheDirectory + 'ozira-tts-' + Date.now() + '.' + ext;
       await writeAsStringAsync(source, base64, { encoding: EncodingType.Base64 });
     }
-    stopSpeaking();
+    assertPlayback(scope, sequence);
     player = createAudioPlayer(source);
     if (typeof onEnd === 'function') {
       try {
         const sub = player.addListener('playbackStatusUpdate', (st) => {
-          if (st && st.didJustFinish) { try { sub.remove(); } catch (_) {} onEnd(); }
+          if (st && st.didJustFinish && sequence === playbackSequence) { try { sub.remove(); } catch (_) {} onEnd(); }
         });
       } catch (_) {}
     }

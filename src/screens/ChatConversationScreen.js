@@ -20,7 +20,7 @@ import { File, Paths } from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
 import { ensurePrepared, finalizeRecording } from '../audioSession';
-import { getCachedConversation, getConversation, saveConversation, deleteConversation, setConversationMeta, setConversationFolder, listFolders, newId, getProfile, saveBookmark, unsaveBookmark, listBookmarkedIndexes } from '../localStore';
+import { useAccountStore } from '../useAccountStore';
 import { getPersistentRun, createOrResolveRun, updatePersistentRun } from '../persistentRun';
 import Logo from '../components/Logo';
 import FlagMenu from '../components/FlagMenu';
@@ -91,6 +91,7 @@ function imageFromDataUrl(value) {
 }
 
 export default function ChatConversationScreen({ navigation, route }) {
+  const { getCachedConversation, getConversation, saveConversation, deleteConversation, setConversationMeta, setConversationFolder, listFolders, newId, getProfile, saveBookmark, unsaveBookmark, listBookmarkedIndexes } = useAccountStore();
   const insets = useSafeAreaInsets();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const colors = useColors();

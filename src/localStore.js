@@ -1,43 +1,80 @@
-// Chat history and folders live on the account, not on the device, so the same
-// chats appear in the mobile app and on the web. This file keeps the API it had
-// when everything was local — the screens call exactly the same functions — but
-// the conversation and folder ones now go through the server.
-//
-// The on-device file is still written on every successful call, demoted from
-// source of truth to a read cache: with no network the app shows the last known
-// list instead of an empty screen. Theme and settings stay local. Profile is
-// also cached here for instant display, but its source of truth is the account
-// API so it follows the user to web and other phones.
+// Owner-scoped read caches; unknown legacy data remains quarantined in place.
 import { Paths, File } from 'expo-file-system';
-import { api } from './api';
-
-let cache = null;
-function file() { return new File(Paths.document, 'ozira-store.json'); }
-
-async function load() {
-  if (cache) return cache;
-  try {
-    const f = file();
-    if (f.exists) { const t = await f.text(); cache = t ? JSON.parse(t) : null; }
-  } catch (_) {}
-  if (!cache) cache = { conversations: {}, order: [], folders: [] };
-  if (!cache.conversations) cache.conversations = {};
-  if (!cache.order) cache.order = [];
-  if (!cache.folders) cache.folders = [];
-  if (!cache.idMap) cache.idMap = {};
-  return cache;
+import { api as transport } from './api';
+import { config } from './config';
+import { captureAccountSession, assertCurrentAccount, isAccountSnapshot } from './accountSession';
+const environment = config.SUPABASE_URL || config.API_BASE;
+const stores = new Map();
+const clone = value => value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+async function readFile(name) {
+  try { const f = new File(Paths.document, name); return f.exists ? JSON.parse(await f.text()) : null; } catch (_) { return null; }
 }
-
-async function persist() {
-  try {
-    const f = file();
-    if (!f.exists) { try { f.create(); } catch (_) {} }
-    await Promise.resolve(f.write(JSON.stringify(cache)));
-  } catch (_) {}
+async function writeFile(name, value) {
+  const f = new File(Paths.document, name);
+  if (!f.exists) f.create();
+  await Promise.resolve(f.write(JSON.stringify(value)));
 }
-
+const preferenceFile = 'ozira-device-preferences-v2.json';
+let preferences;
+async function devicePreferences() {
+  if (!preferences) {
+    const saved = await readFile(preferenceFile);
+    const legacy = saved ? null : await readFile('ozira-store.json');
+    preferences = saved || { theme: legacy?.theme || 'dark' };
+  }
+  return preferences;
+}
+export async function getTheme() { return (await devicePreferences()).theme || 'dark'; }
+export async function setTheme(theme) { const p = await devicePreferences(); p.theme = theme; await writeFile(preferenceFile, p); }
 export function newId() { return 'c_' + Date.now() + '_' + Math.floor(Math.random() * 1000); }
 
+function createStore(scope) {
+  let cache = null;
+  let loading = null;
+  const filename = 'ozira-account-v2-' + encodeURIComponent(environment) + '-' + encodeURIComponent(scope.ownerId) + '.json';
+  const tokenPositions = { conversations: 1, searchConversations: 1, getConversation: 1, saveConversation: 1,
+    deleteConversation: 1, conversationMeta: 2, folders: 0, createFolder: 1, deleteFolder: 1,
+    saveBookmark: 2, unsaveBookmark: 2, listBookmarks: 1 };
+  const api = Object.fromEntries(Object.entries(tokenPositions).map(([name, position]) => [name, async (...args) => {
+    assertCurrentAccount(scope);
+    args[position] = captureAccountSession().token; // same owner/generation, including normal token refresh
+    const result = await transport[name](...args);
+    assertCurrentAccount(scope);
+    return result;
+  }]));
+  async function load() {
+    assertCurrentAccount(scope);
+    if (!loading) loading = (async () => {
+      let saved = await readFile(filename);
+      assertCurrentAccount(scope);
+      if (new File(Paths.document, filename).exists && (!saved || saved.ownerId !== scope.ownerId || saved.environment !== environment)) {
+        throw Object.assign(new Error('Cached account ownership cannot be verified.'), { code: 'CACHE_OWNERSHIP_MISMATCH' });
+      }
+      if (!saved || saved.ownerId !== scope.ownerId || saved.environment !== environment) {
+        const legacy = await readFile('ozira-store.json');
+        assertCurrentAccount(scope);
+        // A profile marker or migration flag does not prove ownership of chats.
+        saved = legacy?.ownerId === scope.ownerId && legacy?.environment === environment ? clone(legacy) : {};
+      }
+      cache = { ...saved, schemaVersion: 2, ownerId: scope.ownerId, environment,
+        conversations: saved.conversations || {}, order: saved.order || [], folders: saved.folders || [], idMap: saved.idMap || {} };
+      for (const [id, conversation] of Object.entries(cache.conversations)) {
+        if (conversation?.ownerId && conversation.ownerId !== scope.ownerId) {
+          cache.quarantinedConversations = { ...(cache.quarantinedConversations || {}), [id]: conversation };
+          delete cache.conversations[id];
+        }
+      }
+      return cache;
+    })();
+    const result = await loading;
+    assertCurrentAccount(scope);
+    return result;
+  }
+  async function persist() {
+    assertCurrentAccount(scope);
+    try { await writeFile(filename, cache); } catch (_) { /* best-effort offline persistence */ }
+    assertCurrentAccount(scope);
+  }
 // A chat gets a local id the moment it is opened, before the server has ever
 // seen it. The first save returns the server's id; this map ties the two
 // together so screens can keep using the id they already hold.
@@ -91,7 +128,7 @@ function migrateInBackground() {
   return migrationInFlight;
 }
 
-export async function listConversations(folderId, opts = {}) {
+async function listConversations(folderId, opts = {}) {
   try {
     // Migration can involve many old local chats and used to block the entire
     // history screen. It is safe to let it finish in the background.
@@ -121,7 +158,7 @@ export async function listConversations(folderId, opts = {}) {
 // content, server-side, cross-tenant isolated — see lib/conversationSearch.js
 // in ozira-ai). Always hits the network: a stale/offline result list here
 // would be actively misleading for a search action.
-export async function searchConversations(query) {
+async function searchConversations(query) {
   const q = String(query || '').trim();
   if (!q) return [];
   const d = await api.searchConversations(q);
@@ -133,15 +170,15 @@ export async function searchConversations(query) {
 
 // Response Save = bookmark ONLY (a conversationId+messageIndex reference),
 // never OZIRA memory. Server-authoritative; nothing is cached on-device.
-export async function saveBookmark(conversationId, messageIndex) {
+async function saveBookmark(conversationId, messageIndex) {
   const rid = await serverId(conversationId);
   return api.saveBookmark(rid, messageIndex);
 }
-export async function unsaveBookmark(conversationId, messageIndex) {
+async function unsaveBookmark(conversationId, messageIndex) {
   const rid = await serverId(conversationId);
   return api.unsaveBookmark(rid, messageIndex);
 }
-export async function listBookmarkedIndexes(conversationId) {
+async function listBookmarkedIndexes(conversationId) {
   try {
     const rid = await serverId(conversationId);
     const d = await api.listBookmarks(rid);
@@ -152,7 +189,7 @@ export async function listBookmarkedIndexes(conversationId) {
 }
 
 // Update flags on a conversation (pinned, archived, ...).
-export async function setConversationMeta(id, patch) {
+async function setConversationMeta(id, patch) {
   const s = await load();
   const rid = await serverId(id);
   if (s.conversations[id]) Object.assign(s.conversations[id], patch);
@@ -163,13 +200,13 @@ export async function setConversationMeta(id, patch) {
 
 // Read the on-device copy without touching the network. Chat screens use this
 // first so a conversation opens immediately, then refresh from the account.
-export async function getCachedConversation(id) {
+async function getCachedConversation(id) {
   const rid = await serverId(id);
   const s = await load();
   return s.conversations[rid] || s.conversations[id] || null;
 }
 
-export async function getConversation(id) {
+async function getConversation(id) {
   const rid = await serverId(id);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 12000);
@@ -185,7 +222,7 @@ export async function getConversation(id) {
   }
 }
 
-export async function saveConversation(conv) {
+async function saveConversation(conv) {
   const s = await load();
   if (s.settings && s.settings.saveHistory === false) return null; // history saving turned off
   const now = Date.now();
@@ -214,7 +251,7 @@ export async function saveConversation(conv) {
   return null;
 }
 
-export async function deleteConversation(id) {
+async function deleteConversation(id) {
   const s = await load();
   const rid = await serverId(id);
   delete s.conversations[id];
@@ -225,7 +262,7 @@ export async function deleteConversation(id) {
   try { await api.deleteConversation(rid); } catch (_) {}
 }
 
-export async function listFolders() {
+async function listFolders() {
   try {
     const d = await api.folders();
     const s = await load();
@@ -238,7 +275,7 @@ export async function listFolders() {
   }
 }
 
-export async function createFolder(name) {
+async function createFolder(name) {
   const d = await api.createFolder(String(name).slice(0, 40));
   const f = d.folder;
   const s = await load();
@@ -247,7 +284,7 @@ export async function createFolder(name) {
   return f;
 }
 
-export async function deleteFolder(id) {
+async function deleteFolder(id) {
   const s = await load();
   s.folders = s.folders.filter(f => f.id !== id);
   Object.values(s.conversations).forEach(c => { if (c.folderId === id) c.folderId = null; });
@@ -255,35 +292,24 @@ export async function deleteFolder(id) {
   try { await api.deleteFolder(id); } catch (_) {}
 }
 
-export async function setConversationFolder(id, folderId) {
+async function setConversationFolder(id, folderId) {
   return setConversationMeta(id, { folderId: folderId || null });
 }
 
-// --- app preferences (device-local on purpose) ---
-export async function getTheme() {
-  const s = await load();
-  return s.theme || 'dark';
-}
-export async function setTheme(mode) {
-  const s = await load();
-  s.theme = mode;
-  await persist();
-}
-
 // --- app settings ---
-export async function getSettings() {
+async function getSettings() {
   const s = await load();
   return s.settings || {};
 }
-export async function setSettings(patch) {
+async function setSettings(patch) {
   const s = await load();
   s.settings = { ...(s.settings || {}), ...patch };
   await persist();
   return s.settings;
 }
-export async function purgeAllHistory() {
+async function purgeAllHistory() {
   const s = await load();
-  const ids = Object.keys(s.conversations);
+  const ids = [...new Set(Object.keys(s.conversations).map(id => s.idMap[id] || id))];
   s.conversations = {};
   s.order = [];
   s.idMap = {};
@@ -293,24 +319,78 @@ export async function purgeAllHistory() {
 }
 
 // --- profile / personalization ---
-export async function getProfile() {
+async function getProfile() {
   const s = await load();
   return s.profile || {};
 }
-export async function getProfileOwnerId() {
+async function getProfileOwnerId() {
   const s = await load();
   return s.profileOwnerId || '';
 }
-export async function replaceProfile(profile, ownerId) {
+async function replaceProfile(profile, ownerId) {
   const s = await load();
+  if (ownerId !== scope.ownerId) throw new Error('Profile owner mismatch.');
   s.profile = { ...(profile || {}) };
   s.profileOwnerId = ownerId || '';
   await persist();
   return s.profile;
 }
-export async function setProfile(patch) {
+async function setProfile(patch) {
   const s = await load();
   s.profile = { ...(s.profile || {}), ...patch };
   await persist();
   return s.profile;
 }
+  return { listConversations, searchConversations, saveBookmark, unsaveBookmark, listBookmarkedIndexes, setConversationMeta, getCachedConversation, getConversation, saveConversation, deleteConversation, listFolders, createFolder, deleteFolder, setConversationFolder, getSettings, setSettings, purgeAllHistory, getProfile, getProfileOwnerId, replaceProfile, setProfile };
+}
+function accountMethod(name) {
+  return async (...args) => {
+    const scope = isAccountSnapshot(args[args.length - 1]) ? args.pop() : captureAccountSession();
+    assertCurrentAccount(scope);
+    for (const generation of stores.keys()) if (generation !== scope.generation) stores.delete(generation);
+    if (!stores.has(scope.generation)) stores.set(scope.generation, createStore(scope));
+    const result = await stores.get(scope.generation)[name](...args);
+    assertCurrentAccount(scope);
+    return clone(result);
+  };
+}
+export const listConversations = accountMethod('listConversations');
+export const searchConversations = accountMethod('searchConversations');
+export const saveBookmark = accountMethod('saveBookmark');
+export const unsaveBookmark = accountMethod('unsaveBookmark');
+export const listBookmarkedIndexes = accountMethod('listBookmarkedIndexes');
+export const setConversationMeta = accountMethod('setConversationMeta');
+export const getCachedConversation = accountMethod('getCachedConversation');
+export const getConversation = accountMethod('getConversation');
+export const saveConversation = accountMethod('saveConversation');
+export const deleteConversation = accountMethod('deleteConversation');
+export const listFolders = accountMethod('listFolders');
+export const createFolder = accountMethod('createFolder');
+export const deleteFolder = accountMethod('deleteFolder');
+export const setConversationFolder = accountMethod('setConversationFolder');
+export async function getSettings(...args) {
+  const scope = isAccountSnapshot(args[args.length - 1]) ? args[args.length - 1] : captureAccountSession();
+  if (!scope.ownerId) {
+    assertCurrentAccount(scope, false);
+    const lang = (await devicePreferences()).lang || 'en';
+    assertCurrentAccount(scope, false);
+    return { lang };
+  }
+  return accountMethod('getSettings')(...args);
+}
+export async function setSettings(patch, scope = captureAccountSession()) {
+  if (!scope.ownerId) {
+    assertCurrentAccount(scope, false);
+    const p = await devicePreferences();
+    assertCurrentAccount(scope, false);
+    if (typeof patch.lang === 'string') p.lang = patch.lang;
+    await writeFile(preferenceFile, p);
+    return { lang: p.lang || 'en' };
+  }
+  return accountMethod('setSettings')(patch, scope);
+}
+export const purgeAllHistory = accountMethod('purgeAllHistory');
+export const getProfile = accountMethod('getProfile');
+export const getProfileOwnerId = accountMethod('getProfileOwnerId');
+export const replaceProfile = accountMethod('replaceProfile');
+export const setProfile = accountMethod('setProfile');

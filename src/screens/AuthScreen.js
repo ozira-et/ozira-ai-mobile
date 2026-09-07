@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Pre
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { fonts, spacing } from '../theme';
-import { setProfile } from '../localStore';
 import { useColors } from '../context/ThemeContext';
 import Logo from '../components/Logo';
 import Button from '../components/Button';
@@ -33,8 +32,7 @@ export default function AuthScreen() {
   async function submit() {
     setErr(''); setMsg(''); setBusy(true);
     try {
-      if (mode === 'register') { await signUp(name.trim(), email.trim(), password, lang, gender); await setLang(lang);
-        try { await setProfile({ gender }); } catch (_) {} }
+      if (mode === 'register') { await signUp(name.trim(), email.trim(), password, lang, gender); await setLang(lang); }
       else await signIn(email.trim(), password);
     } catch (e) { setErr(e.message); }
     setBusy(false);

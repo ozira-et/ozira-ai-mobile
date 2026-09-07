@@ -4,6 +4,7 @@ describe('persistent run discovery failure boundary', () => {
   const args = { ownerId: 'user-a', conversationId: 'cnv-existing', objective: 'Existing task', token: 'synthetic-a' };
   beforeEach(() => {
     jest.resetModules();
+    require('../src/accountSession').setAccountSession('synthetic-a', 'user-a');
     storage = { getItem: jest.fn(async () => null), setItem: jest.fn(async () => {}), removeItem: jest.fn(async () => {}) };
     api = {
       discoverRun: jest.fn(async () => ({ run: null })),
