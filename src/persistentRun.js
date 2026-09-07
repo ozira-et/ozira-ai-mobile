@@ -128,7 +128,7 @@ export async function resumePersistentRun({ ownerId, conversationId, token } = {
   return response.run || null;
 }
 
-export async function updatePersistentRun({ ownerId, conversationId, token, patch = {}, retryConflict = true } = {}) {
+export async function updatePersistentRun({ ownerId, conversationId, token, patch = {} } = {}) {
   const state = await load(ownerId);
   const entry = state.runs[key(conversationId)];
   if (!entry?.runId) return null;
@@ -137,13 +137,13 @@ export async function updatePersistentRun({ ownerId, conversationId, token, patc
     const response = await send(Number(patch.stateVersion));
     return response.run || null;
   } catch (error) {
-    if (!retryConflict || error.code !== 'VERSION_CONFLICT') throw error;
-    // Re-read canonical state and retry once with its current version. This
-    // never writes the stale state over the newer server state.
-    const current = await getPersistentRun({ ownerId, conversationId, token });
-    if (!current) throw error;
-    const response = await send(Number(current.stateVersion));
-    return response.run || null;
+    if (error.code !== 'VERSION_CONFLICT') throw error;
+    // Refresh for explicit reconciliation, never replay the rejected patch.
+    // Preserve the original 409 even if the follow-up read fails.
+    try {
+      error.currentRun = await getPersistentRun({ ownerId, conversationId, token });
+    } catch (_) { /* The caller must still see the original conflict. */ }
+    throw error;
   }
 }
 

@@ -335,10 +335,11 @@ export default function ChatConversationScreen({ navigation, route }) {
       try {
         const run = await getPersistentRun({ ownerId: user?.id, conversationId: id, token });
         if (active) setCurrentRun(run);
-        // The staging-only diagnostic is a server projection, not a local
-        // cache. It is rendered only in development builds for acceptance.
-        const diagnostic = await api.runDiagnostic(id, token);
-        if (active) setContinuityDiagnostic(diagnostic);
+        // Request the server projection only in explicit staging builds.
+        if (config.IS_STAGING === true) {
+          const diagnostic = await api.runDiagnostic(id, token);
+          if (active) setContinuityDiagnostic(diagnostic);
+        }
       } catch (_) { /* run discovery is auxiliary to transcript hydration */ }
     })();
     setSavedIndexes(new Set());
@@ -591,7 +592,13 @@ export default function ChatConversationScreen({ navigation, route }) {
       messages: messages.map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content : '', image: m.image || null, imageId: m.imageId || null, thumb: m.thumb || null, model: m.model || null, reaction: m.reaction || 0 })),
     }).then(saved => {
       if (!saved?.id) return;
-      void syncPersistentRun(saved.id, title, messages.length).catch(() => {});
+      void syncPersistentRun(saved.id, title, messages.length).catch(error => {
+        if (error.code !== 'VERSION_CONFLICT') return;
+        if (error.currentRun && activeRunRef.current?.conversationId === saved.id) {
+          setCurrentRun(error.currentRun);
+        }
+        notify('Conversation changed', 'The run update was rejected because another client changed it. Reopen the conversation and review the latest state before continuing.', 'error');
+      });
     }).catch(() => {});
   }, [messages, token, user?.id]);
 

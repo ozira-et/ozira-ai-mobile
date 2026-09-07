@@ -12,6 +12,26 @@ describe('mobile Persistent Run API contract', () => {
     api = require('../src/api').api;
   });
 
+  it.each([false, undefined, 'staging'])('does not request diagnostics unless staging is explicitly true (%s)', async value => {
+    require('../src/config').config.IS_STAGING = value;
+    await expect(api.runDiagnostic('c_12345678', 'session-token')).resolves.toBeNull();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('requests authenticated diagnostics in staging', async () => {
+    require('../src/config').config.IS_STAGING = true;
+    await api.runDiagnostic('c_12345678', 'session-token');
+    expect(seen.url).toContain('/api/runs/diagnostic');
+    expect(seen.init.headers.authorization).toBe('Bearer session-token');
+    expect(JSON.parse(seen.init.body)).toEqual({ conversationId: 'c_12345678' });
+  });
+
+  it('preserves the server conflict status and code', async () => {
+    global.fetch.mockResolvedValue({ ok: false, status: 409, json: async () => ({ error: 'stale', code: 'VERSION_CONFLICT' }) });
+    await expect(api.updateRun('run_1', { stateVersion: 1 }, 'session-token')).rejects.toMatchObject({ status: 409, code: 'VERSION_CONFLICT' });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
   it.each([
     ['createRun', '/api/runs', { objective: 'Task' }],
     ['getRun', '/api/runs/get', { runId: 'run_1' }],
