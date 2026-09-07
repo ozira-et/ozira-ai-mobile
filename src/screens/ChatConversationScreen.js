@@ -661,7 +661,7 @@ export default function ChatConversationScreen({ navigation, route }) {
         const d = await api.aiResearch(text, token, signal);
         const body = d.configured ? (d.text || d.error || 'No result.') : (d.notice || 'Research is not set up yet.');
         const src = (d.sources && d.sources.length) ? '\n\nSources:\n' + d.sources.slice(0, 5).join('\n') : '';
-        setMessages([...next, { role: 'assistant', content: body + src, model: 'Research' }]);
+        setMessages([...next, { role: 'assistant', content: body + src, model: 'Research', metadata: d.metadata || null }]);
         // Read only the answer aloud. Source URLs are useful on screen but should
         // never be sent to TTS, especially for voice-originated requests.
         if (fromVoice && body) {
@@ -671,7 +671,7 @@ export default function ChatConversationScreen({ navigation, route }) {
       } else if (visionImage) {
         const history = next.map((m, i) => ({ role: m.role, content: i === next.length - 1 ? (text || 'What is in this image?') : (typeof m.content === 'string' ? m.content : '') }));
         const d = await api.aiVision({ tier: mode, effort, skill, messages: history, images: [visionImage], lang }, token, signal);
-        setMessages([...next, { role: 'assistant', content: d.reply || d.error || 'No reply.', model: d.modelLabel || 'Vision' }]);
+        setMessages([...next, { role: 'assistant', content: d.reply || d.error || 'No reply.', model: d.modelLabel || 'Vision', metadata: d.metadata || null }]);
       } else {
         let lastContent = text;
         if (att && att.kind === 'file' && att.text) {

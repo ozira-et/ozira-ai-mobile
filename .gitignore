@@ -1,6 +1,7 @@
 node_modules/
 .expo/
 dist/
+dist-card-check/
 web-build/
 *.log
 .DS_Store

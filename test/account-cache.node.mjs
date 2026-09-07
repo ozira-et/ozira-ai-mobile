@@ -73,6 +73,21 @@ async function fixture(legacy = null, existingFiles = null) {
   };
 }
 
+test('saved response cards remain scoped to their owner across logout and restart', async () => {
+  const f = await fixture();
+  f.api.setToken('a', 'user-a');
+  const message = { role: 'assistant', content: 'Synthetic weather', metadata: { responseCards: [{ schemaVersion: 1, cardId: 'card_saved_123', type: 'current_weather', lifecycle: 'success', title: 'Synthetic', payload: { location: 'Dubai', temperatureC: 36 }, sources: [{ label: 'Synthetic source', href: 'https://example.com/weather' }] }] } };
+  await f.store.saveConversation({ id: 'card-conversation', messages: [message] });
+  f.offline();
+  const cached = await f.store.getCachedConversation('card-conversation');
+  assert.equal(cached.messages[0].metadata.responseCards[0].cardId, 'card_saved_123');
+  f.api.setToken('b', 'user-b');
+  assert.equal(await f.store.getCachedConversation('card-conversation'), null);
+  const restarted = await fixture(null, f.files);
+  restarted.api.setToken('a2', 'user-a'); restarted.offline();
+  assert.equal((await restarted.store.getCachedConversation('card-conversation')).messages[0].metadata.responseCards[0].sources[0].href, 'https://example.com/weather');
+});
+
 test('A retains own offline history, but B cannot list or read it', async () => {
   const f = await fixture();
   f.api.setToken('synthetic-a', 'user-a');
