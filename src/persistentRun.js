@@ -50,21 +50,11 @@ export async function createOrResolveRun({ ownerId, conversationId, objective, t
   const state = await load(ownerId);
   const conversationKey = key(conversationId);
   if (!conversationKey) throw Object.assign(new Error('Conversation is required.'), { code: 'VALIDATION', status: 400 });
-  const cached = state.runs[conversationKey];
-  if (cached?.runId) {
-    try {
-      const current = await getPersistentRun({ ownerId, conversationId, token });
-      return current;
-    } catch (error) {
-      if (error.code !== 'NOT_FOUND') throw error;
-      delete state.runs[conversationKey];
-      await save();
-    }
-  }
   // A fresh device may have no local link at all. Resolve the server-owned
   // run before creating anything so a conversation cannot fork merely because
   // the user opened it on another client first. The stable create idempotency
-  // key remains the final safety net if discovery is temporarily unavailable.
+  // key remains the final safety net for concurrent creates after a successful
+  // empty discovery. Failed discovery must not authorize a new run.
   const discovered = await getPersistentRun({ ownerId, conversationId: conversationKey, token });
   if (discovered) return discovered;
   const idempotencyKey = `mobile:${conversationKey}`.slice(0, 160);
@@ -88,6 +78,7 @@ export async function getPersistentRun({ ownerId, conversationId, token } = {}) 
 
   // The server is authoritative. The local mapping is only a compatibility
   // cache for offline/older-server cases and is refreshed from discovery.
+  let discoveryError = null;
   try {
     const discovered = await api.discoverRun(conversationKey, token);
     if (discovered?.run?.runId) {
@@ -102,17 +93,29 @@ export async function getPersistentRun({ ownerId, conversationId, token } = {}) 
       }
       return discovered.run;
     }
-  } catch (_) {
-    // Preserve the existing offline behavior by falling through to the local
-    // hint when the discovery endpoint is unreachable.
+    if (discovered?.run !== null) {
+      throw Object.assign(new Error('The server returned an invalid run discovery result.'), {
+        code: 'RUN_DISCOVERY_INVALID', status: 502,
+      });
+    }
+  } catch (error) {
+    if (error.status === 401 || error.status === 403) throw error;
+    // A hint can still be verified by an authenticated get, but a failed
+    // discovery is not an authoritative absence result.
+    discoveryError = error;
   }
   const entry = state.runs[conversationKey];
-  if (!entry?.runId) return null;
+  if (!entry?.runId) {
+    if (discoveryError) throw discoveryError;
+    return null;
+  }
   try {
     const response = await api.getRun(entry.runId, token);
+    if (!response.run && discoveryError) throw discoveryError;
     return response.run || null;
   } catch (error) {
     if (error.code === 'NOT_FOUND') {
+      if (discoveryError) throw discoveryError;
       delete state.runs[conversationKey];
       await save();
       return null;
