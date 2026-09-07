@@ -1,11 +1,10 @@
-// Red overlay drawer: slides in from the left over the app, with a dim backdrop.
+// Workspace drawer: slides in from the left over the app, with a dim backdrop.
 // Plain built-in Animated (no Reanimated), and it does NOT transform the app
 // content — that was crashing Android.
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { View, Text, Pressable, StyleSheet, ScrollView, Animated, Dimensions, TextInput, Modal, Alert, Image, ImageBackground, PanResponder } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView, Animated, Dimensions, TextInput, Modal, Alert, Image, PanResponder } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { fonts, radius } from '../theme';
 import { useColors } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -179,8 +178,7 @@ export default function Sidebar() {
       </Animated.View>
 
       <Animated.View {...drawerPan.panHandlers} style={[styles.panel, { width: WIDTH, paddingTop: insets.top + 8, transform: [{ translateX: tx }] }]}>
-        <ImageBackground source={require('../../assets/sidebar-artistic-gradient.png')} style={styles.panelImage} imageStyle={styles.panelImageArt}>
-        <LinearGradient pointerEvents="none" colors={['rgba(8,2,7,0)', 'rgba(8,2,7,0.78)']} locations={[0, 1]} style={styles.bottomShade} />
+        <View style={styles.panelImage} accessibilityLabel="OZIRA workspace drawer">
         <View style={styles.panelContent}>
         <View style={styles.topRow}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -315,7 +313,7 @@ export default function Sidebar() {
         ) : null}
         <View style={{ height: insets.bottom + 6 }} />
         </View>
-        </ImageBackground>
+        </View>
       </Animated.View>
 
       <Modal visible={createOpen} transparent animationType="fade" onRequestClose={() => setCreateOpen(false)}>
@@ -365,30 +363,30 @@ export default function Sidebar() {
 const makeStyles = (colors) => StyleSheet.create({
   overlayRoot: { zIndex: 1000, elevation: 1000 },
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
-  panel: { position: 'absolute', top: 0, bottom: 0, left: 0, backgroundColor: '#210913', overflow: 'hidden' },
+  panel: { position: 'absolute', top: 0, bottom: 0, left: 0, backgroundColor: '#111318', borderRightWidth: 1, borderRightColor: '#282B33', overflow: 'hidden' },
   panelImage: { flex: 1 },
   panelImageArt: { opacity: 0.94 },
   bottomShade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 245 },
-  panelContent: { flex: 1, paddingHorizontal: 16, backgroundColor: 'rgba(20,4,13,0.16)' },
-  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
+  panelContent: { flex: 1, paddingHorizontal: 18 },
+  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 },
   logoDot: { width: 32, height: 32, borderRadius: 16, backgroundColor: ON, alignItems: 'center', justifyContent: 'center' },
   brand: { color: ON, fontFamily: fonts.bold, fontSize: 18 },
   topActions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
-  newChat: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: ON, borderRadius: 999, paddingVertical: 11 },
+  newChat: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: ON, borderRadius: 14, minHeight: 48, paddingVertical: 12 },
   newChatTxt: { color: RED, fontFamily: fonts.semibold, fontSize: 14 },
   // 44x44 minimum touch target, matching the mobile accessibility bar used
   // throughout ChatConversationScreen's response actions.
-  searchToggle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: CARD, borderWidth: 1, borderColor: LINE },
+  searchToggle: { width: 48, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: CARD, borderWidth: 1, borderColor: LINE },
   searchToggleOn: { backgroundColor: CARD_ON },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: CARD, borderWidth: 1, borderColor: LINE, borderRadius: 12, paddingHorizontal: 12, height: 42, marginTop: 10 },
   searchInput: { flex: 1, color: ON, fontFamily: fonts.regular, fontSize: 14.5, height: '100%' },
   sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   section: { color: DIM, fontFamily: fonts.semibold, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.6 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: CARD, borderWidth: 1, borderColor: LINE, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: CARD, borderWidth: 1, borderColor: LINE, borderRadius: 10, minHeight: 44, paddingHorizontal: 12, paddingVertical: 10 },
   chipOn: { backgroundColor: CARD_ON },
   chipTxt: { color: ON, fontFamily: fonts.medium, fontSize: 12.5 },
   empty: { color: DIM, fontFamily: fonts.regular, fontSize: 13, marginTop: 6 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 10, borderRadius: radius.md, marginTop: 2 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 54, paddingVertical: 14, paddingHorizontal: 10, borderRadius: 12, marginTop: 4, backgroundColor: '#191C23' },
   rowTxt: { color: ON, fontFamily: fonts.regular, fontSize: 14.5, flex: 1 },
   upgrade: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: ON, borderRadius: radius.md, paddingVertical: 11, marginVertical: 8 },
   upgradeTxt: { color: RED, fontFamily: fonts.semibold, fontSize: 13.5 },

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, Image, ImageBackground, Keyboard, Platform, ActivityIndicator, Modal, Alert, Share, Animated, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, TextInput, Image, Keyboard, Platform, ActivityIndicator, Modal, Alert, Share, Animated, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
@@ -751,25 +751,19 @@ export default function ChatConversationScreen({ navigation, route }) {
       <ScrollView ref={scrollRef} contentContainerStyle={{ padding: 16, paddingBottom: 16 }} onContentSizeChange={scrollDown}>
         {messages.length === 0 && (
           <View style={styles.empty}>
-            {/* The same artwork as the sidebar gives the empty-chat home a connected look. */}
-            <ImageBackground source={require('../../assets/sidebar-artistic-gradient.png')} style={styles.hero} imageStyle={styles.heroArt}>
+            <View style={styles.hero} accessibilityLabel="OZIRA conversation workspace">
               <View style={styles.heroInner}>
               <View style={styles.heroLogo}>
                 {imageMode ? <Ionicons name="image" size={34} color={PRIMARY_RED} /> : <Logo size={44} />}
               </View>
-              <View style={styles.triDots}>
-                <View style={[styles.dot, { backgroundColor: FLAG.green }]} />
-                <View style={[styles.dot, { backgroundColor: FLAG.yellow }]} />
-                <View style={[styles.dot, { backgroundColor: FLAG.red }]} />
-              </View>
-              <Text style={styles.heroGreet}>
+              <Text style={[styles.heroGreet, rtlText(rtl)]}>
                 {imageMode ? t('describeImage') : `${greetWord}, ${firstName} 👋`}
               </Text>
-              <Text style={styles.heroSub}>
+              <Text style={[styles.heroSub, rtlText(rtl)]}>
                 {imageMode ? 'Describe an image to generate.' : t('emptyHint')}
               </Text>
               </View>
-            </ImageBackground>
+            </View>
 
             {!imageMode && (
               <View style={styles.sugWrap}>
@@ -890,7 +884,7 @@ export default function ChatConversationScreen({ navigation, route }) {
           </View>
         ) : null}
         <View style={[styles.inputRow, rtlRow(rtl)]}>
-          <Pressable onPress={() => setMenuOpen(true)} style={styles.round}>
+          <Pressable onPress={() => setMenuOpen(true)} style={styles.round} accessibilityRole="button" accessibilityLabel="Add attachment or tool">
             <Ionicons name="add" size={24} color={colors.primary} />
           </Pressable>
           <TextInput
@@ -913,7 +907,7 @@ export default function ChatConversationScreen({ navigation, route }) {
           ) : transcribing ? (
             <View style={styles.send}><ActivityIndicator size="small" color={colors.white} /></View>
           ) : (input.trim() || attachment) ? (
-            <Pressable onPress={send} style={styles.send}>
+            <Pressable onPress={send} style={styles.send} accessibilityRole="button" accessibilityLabel="Send message">
               <Ionicons name="arrow-up" size={20} color={colors.white} />
             </Pressable>
           ) : (
@@ -1149,14 +1143,13 @@ export default function ChatConversationScreen({ navigation, route }) {
 const makeStyles = (colors) => StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 14, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.border,
+    paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
   },
   title: { color: colors.text, fontFamily: fonts.semibold, fontSize: 14, flex: 1, textAlign: 'center', marginHorizontal: 8 },
   modeSel: {
     flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: 8,
-    backgroundColor: colors.primary + '10', borderWidth: 1, borderColor: colors.border,
-    borderRadius: 999, paddingHorizontal: 8, paddingVertical: 5,
-    shadowColor: '#000', shadowOpacity: 0.10, shadowRadius: 5, shadowOffset: { width: 0, height: 2 }, elevation: 2,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+    borderRadius: 12, paddingHorizontal: 10, paddingVertical: 10,
   },
   modeSelTxt: { color: colors.text, fontFamily: fonts.semibold, fontSize: 12, lineHeight: 16 },
   modeDrop: {
@@ -1190,7 +1183,7 @@ const makeStyles = (colors) => StyleSheet.create({
   },
   actionMenuItem: { minHeight: 44, paddingHorizontal: 11, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
   actionMenuText: { color: colors.text, fontFamily: fonts.medium, fontSize: 14 },
-  moreBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.primary + '12', alignItems: 'center', justifyContent: 'center' },
+  moreBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   convMenuBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.26)', alignItems: 'flex-end', paddingRight: 12 },
   convMenu: {
     backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
@@ -1205,35 +1198,35 @@ const makeStyles = (colors) => StyleSheet.create({
   renameInput: { backgroundColor: colors.bg, borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 12, height: 44, color: colors.text, fontFamily: fonts.regular, fontSize: 15, marginTop: 4, marginBottom: 10 },
   renameBtn: { backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 11, alignItems: 'center' },
   renameBtnTxt: { color: colors.white, fontFamily: fonts.semibold, fontSize: 14 },
-  empty: { marginTop: 18, gap: 18 },
+  empty: { marginTop: 24, gap: 28, paddingBottom: 16 },
   hero: {
-    backgroundColor: '#250914', borderRadius: 26, overflow: 'hidden',
+    backgroundColor: colors.bg, borderRadius: 24, overflow: 'hidden',
   },
   heroArt: { opacity: 0.92 },
-  heroInner: { alignItems: 'center', paddingVertical: 26, paddingHorizontal: 22, gap: 11, backgroundColor: 'rgba(28,5,16,0.18)' },
+  heroInner: { alignItems: 'flex-start', paddingVertical: 18, paddingHorizontal: 8, gap: 16 },
   heroLogo: {
-    width: 68, height: 68, borderRadius: 34, backgroundColor: '#FFFFFF',
+    width: 52, height: 52, borderRadius: 16, backgroundColor: colors.surface,
     alignItems: 'center', justifyContent: 'center',
   },
   triDots: { flexDirection: 'row', gap: 7 },
   dot: { width: 9, height: 9, borderRadius: 5 },
-  heroGreet: { color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 21, textAlign: 'center' },
-  heroSub: { color: 'rgba(255,255,255,0.82)', fontFamily: fonts.regular, fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  heroGreet: { color: colors.text, fontFamily: fonts.semibold, fontSize: 28, lineHeight: 37, textAlign: 'left' },
+  heroSub: { color: colors.muted, fontFamily: fonts.regular, fontSize: 15, textAlign: 'left', lineHeight: 23 },
   sugWrap: { gap: 10 },
   sug: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    borderRadius: 16, paddingVertical: 13, paddingHorizontal: 14,
+    borderRadius: 16, minHeight: 64, paddingVertical: 14, paddingHorizontal: 16,
   },
   sugIcon: {
-    width: 34, height: 34, borderRadius: 17, backgroundColor: colors.card,
+    width: 36, height: 36, borderRadius: 12, backgroundColor: colors.primary + '12',
     alignItems: 'center', justifyContent: 'center',
   },
   sugTxt: { flex: 1, color: colors.text, fontFamily: fonts.medium, fontSize: 14.5 },
   greet: { color: colors.text, fontFamily: fonts.bold, fontSize: 20, textAlign: 'center' },
   emptyTxt: { color: colors.muted, fontFamily: fonts.regular, fontSize: 14.5, textAlign: 'center' },
-  bubble: { maxWidth: '86%', padding: 12, borderRadius: 16, marginBottom: 12 },
-  user: { alignSelf: 'flex-end', backgroundColor: colors.card, borderBottomRightRadius: 4 },
+  bubble: { maxWidth: '90%', padding: 16, borderRadius: 20, marginBottom: 20 },
+  user: { alignSelf: 'flex-end', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderBottomRightRadius: 8 },
   ai: {
     alignSelf: 'stretch', maxWidth: '100%', backgroundColor: 'transparent', borderWidth: 0,
     paddingHorizontal: 2, paddingVertical: 8,
@@ -1241,7 +1234,7 @@ const makeStyles = (colors) => StyleSheet.create({
   who: { color: colors.primary, fontFamily: fonts.semibold, fontSize: 11.5, marginBottom: 5 },
   thinkingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 30 },
   thinkingTxt: { color: colors.muted, fontFamily: fonts.medium, fontSize: 13 },
-  msgTxt: { color: colors.text, fontFamily: fonts.regular, fontSize: 15, lineHeight: 22 },
+  msgTxt: { color: colors.text, fontFamily: fonts.regular, fontSize: 15, lineHeight: 25 },
   speakBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8, alignSelf: 'flex-start' },
   speakTxt: { color: colors.muted, fontFamily: fonts.medium, fontSize: 12 },
   image: { width: 240, height: 240, borderRadius: 12 },
@@ -1292,8 +1285,7 @@ const makeStyles = (colors) => StyleSheet.create({
   },
   viewerSavedBadgeTxt: { color: '#FFFFFF', fontFamily: fonts.bold, fontSize: 14 },
   composer: {
-    paddingHorizontal: 12, paddingTop: 8, backgroundColor: colors.bg,
-    borderTopWidth: 1, borderTopColor: colors.border,
+    paddingHorizontal: 16, paddingTop: 10, backgroundColor: colors.bg,
   },
   imgHint: { color: colors.primary, fontFamily: fonts.medium, fontSize: 12, marginBottom: 6, marginLeft: 6 },
   modeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8, marginLeft: 2 },
@@ -1328,24 +1320,22 @@ const makeStyles = (colors) => StyleSheet.create({
   menuLabel: { color: colors.text, fontFamily: fonts.semibold, fontSize: 15 },
   menuSub: { color: colors.muted, fontFamily: fonts.regular, fontSize: 12, marginTop: 1 },
   soon: { color: colors.muted, fontFamily: fonts.medium, fontSize: 11, backgroundColor: colors.card, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
-  inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
+  inputRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, padding: 6, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 24 },
   round: {
-    width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary + '12',
-    borderWidth: 1, borderColor: colors.primary + '55', alignItems: 'center', justifyContent: 'center',
+    width: 44, height: 44, borderRadius: 16, backgroundColor: 'transparent',
+    alignItems: 'center', justifyContent: 'center',
   },
   input: {
-    flex: 1, minHeight: 44, maxHeight: 120, backgroundColor: colors.surface,
-    borderWidth: 1, borderColor: colors.border, borderRadius: radius.xl,
-    paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12,
+    flex: 1, minHeight: 44, maxHeight: 120, backgroundColor: 'transparent',
+    paddingHorizontal: 6, paddingTop: 12, paddingBottom: 12,
     color: colors.text, fontFamily: fonts.regular, fontSize: 15,
   },
   send: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: colors.primary,
+    width: 44, height: 44, borderRadius: 16, backgroundColor: colors.primary,
     alignItems: 'center', justifyContent: 'center',
   },
   voiceBtn: {
-    width: 48, height: 48, borderRadius: 24, overflow: 'hidden', elevation: 4,
-    shadowColor: colors.primary, shadowOpacity: 0.35, shadowRadius: 8, shadowOffset: { width: 0, height: 3 },
+    width: 44, height: 44, borderRadius: 16, overflow: 'hidden',
   },
   voiceWave: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   stopBtn: {
