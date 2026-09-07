@@ -15,7 +15,7 @@ export function ResponseCard({ card }) {
   const ready = card.lifecycle === 'success' || card.lifecycle === 'partial';
   const isWeather = ready && card.type === 'current_weather';
   const isPlace = ready && card.type === 'place';
-  const summary = card.fallbackText || payload.summary || '';
+  const summary = card.fallbackText || (typeof payload.summary === 'string' ? payload.summary : '');
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]} accessibilityLabel={card.title}>
       <Text style={[styles.eyebrow, { color: '#CE1C40' }]}>{card.provider || 'OZIRA'}</Text>

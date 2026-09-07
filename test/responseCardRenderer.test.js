@@ -45,3 +45,9 @@ test('malformed cards render nothing, leaving parent text fallback intact', asyn
   await render([{ ...base, schemaVersion: 999 }]);
   expect(tree.toJSON()).toBeNull();
 });
+
+test('non-text payload summary cannot crash native rendering', async () => {
+  const output = await render([{ ...base, fallbackText: undefined, payload: { location: 'Dubai', summary: { unexpected: true } } }]);
+  expect(output).toContain('Synthetic Dubai');
+  expect(output).not.toContain('unexpected');
+});
