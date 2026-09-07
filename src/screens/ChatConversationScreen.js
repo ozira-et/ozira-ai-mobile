@@ -14,6 +14,7 @@ import { useNotify } from '../context/NotifyContext';
 import { api, absUrl } from '../api';
 import { config } from '../config';
 import Markdown from '../components/Markdown';
+import { MessageResponseCards } from '../components/ResponseCard';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
@@ -587,10 +588,10 @@ export default function ChatConversationScreen({ navigation, route }) {
     dirtyRef.current = false;
     const firstUser = messages.find(m => m.role === 'user');
     const title = ((firstUser && typeof firstUser.content === 'string' ? firstUser.content : '') || 'New chat').slice(0, 40);
-    saveConversation({
+      saveConversation({
       id: convId,
       title,
-      messages: messages.map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content : '', image: m.image || null, imageId: m.imageId || null, thumb: m.thumb || null, model: m.model || null, reaction: m.reaction || 0 })),
+        messages: messages.map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content : '', image: m.image || null, imageId: m.imageId || null, thumb: m.thumb || null, model: m.model || null, reaction: m.reaction || 0, metadata: m.metadata || null })),
     }).then(saved => {
       if (!saved?.id) return;
       void syncPersistentRun(saved.id, title, messages.length).catch(error => {
@@ -680,7 +681,7 @@ export default function ChatConversationScreen({ navigation, route }) {
         if (instrRef.current) msgs.unshift({ role: 'system', content: instrRef.current });
         const payload = { model: 'auto', tier: mode, effort, skill, messages: msgs, lang };
         const d = await api.chat(payload, token, signal);
-        setMessages([...next, { role: 'assistant', content: d.reply, model: d.modelLabel }]);
+        setMessages([...next, { role: 'assistant', content: d.reply, model: d.modelLabel, metadata: d.metadata || null }]);
         if (fromVoice && d.reply) {
           const spoken = await speakText(d.reply, token);
           if (!spoken?.ok) notify(t('notifFailed'), spoken?.message || 'Could not play the spoken reply.', 'error');
@@ -804,7 +805,10 @@ export default function ChatConversationScreen({ navigation, route }) {
             ) : m.role === 'assistant' ? (
               // AI answers are markdown — render them as a formatted result,
               // not raw ** and ## in a chat bubble.
-              <Markdown text={m.content} colors={colors} style={[styles.msgTxt, rtlText(rtl)]} />
+              <>
+                <MessageResponseCards message={m} />
+                <Markdown text={m.content} colors={colors} style={[styles.msgTxt, rtlText(rtl)]} />
+              </>
             ) : (
               <Text style={[styles.msgTxt, rtlText(rtl), { color: colors.text }]}>{m.content}</Text>
             )}
