@@ -34,7 +34,7 @@
     "expo-secure-store": "~15.0.0",
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.0",
-    "ozira-app-core": "file:vendor/ozira-app-core-0.1.0.tgz",
+    "ozira-app-core": "file:vendor/ozira-app-core-0.1.1.tgz",
     "ozira-contracts": "file:vendor/ozira-contracts-0.1.0.tgz",
     "react": "19.1.0",
     "react-native": "0.81.5",
