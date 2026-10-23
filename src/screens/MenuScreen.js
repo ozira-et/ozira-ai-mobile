@@ -29,6 +29,7 @@ const GROUPS = [
     { key: 'mUsage', icon: 'speedometer', tone: 'success', route: 'Usage' },
     { key: 'mTeam', icon: 'people', tone: 'secondary', route: 'Team' },
     { key: 'mAccount', icon: 'person', tone: 'primary', route: 'Account' },
+    { key: 'mMemory', icon: 'bulb', tone: 'gold', route: 'Memory' },
     { key: 'mSettings', icon: 'settings', tone: 'primary', route: 'Settings' },
   ] },
 ];

@@ -19,7 +19,7 @@ import { File, Paths } from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import { useAudioRecorder, RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
 import { ensurePrepared, finalizeRecording } from '../audioSession';
-import { getCachedConversation, getConversation, saveConversation, deleteConversation, setConversationMeta, setConversationFolder, listFolders, newId, getProfile } from '../localStore';
+import { getCachedConversation, getConversation, saveConversation, deleteConversation, setConversationMeta, setConversationFolder, listFolders, newId } from '../localStore';
 import Logo from '../components/Logo';
 import FlagMenu from '../components/FlagMenu';
 import VoiceOverlay from '../components/VoiceOverlay';
@@ -120,7 +120,6 @@ export default function ChatConversationScreen({ navigation, route }) {
   const abortRef = useRef(null);
   const [convId, setConvId] = useState(route.params?.conversationId || newId());
   const dirtyRef = useRef(false);
-  const instrRef = useRef('');
   const [kb, setKb] = useState(0);
   const [modeOpen, setModeOpen] = useState(false);     // Model + reply-depth picker
   const [convMenu, setConvMenu] = useState(false);     // top-right ⋯ menu
@@ -140,7 +139,6 @@ export default function ChatConversationScreen({ navigation, route }) {
   const [savingImage, setSavingImage] = useState(false);
   const [imageSaved, setImageSaved] = useState(false);
 
-  useEffect(() => { getProfile().then(p => { instrRef.current = p.customInstructions || ''; }).catch(() => {}); }, []);
   useEffect(() => () => {
     stopSpeaking();
     if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
@@ -566,7 +564,8 @@ export default function ChatConversationScreen({ navigation, route }) {
           lastContent = 'Here is a file named "' + att.name + '":\n\n' + att.text.slice(0, 12000) + '\n\n' + (text || 'Please read this and help me.');
         }
         const msgs = next.map((m, i) => ({ role: m.role, content: i === next.length - 1 ? lastContent : (typeof m.content === 'string' ? m.content : '') }));
-        if (instrRef.current) msgs.unshift({ role: 'system', content: instrRef.current });
+        // Response style (profile.customInstructions) and unified memories are
+        // injected server-side from the account, so no client system message.
         const payload = { model: 'auto', tier: mode, effort, skill, messages: msgs, lang };
         const d = await api.chat(payload, token, signal);
         setMessages([...next, { role: 'assistant', content: d.reply, model: d.modelLabel }]);

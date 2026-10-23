@@ -14,7 +14,7 @@ import { zodiacFor, isValidBirthday } from '../zodiac';
 
 const INTERESTS = ['Business', 'Technology', 'Travel', 'Sports', 'Health', 'Education', 'Entertainment', 'News', 'Faith', 'Cooking', 'Fashion', 'Finance'];
 
-export default function ProfileScreen() {
+export default function ProfileScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -136,10 +136,18 @@ export default function ProfileScreen() {
           ))}
         </View>
 
-        <Text style={styles.section}>Custom instructions</Text>
+        {/* Response style stays a profile field (the server injects it into
+            every chat). Facts the AI should remember now live in unified
+            memory (store.memories), managed on the Memory screen. */}
+        <Text style={styles.section}>{t('responseStyle')}</Text>
         <View style={styles.card}>
-          <TextInput style={[styles.input, { height: 96, textAlignVertical: 'top', paddingTop: 12 }]} value={instructions} onChangeText={setInstructions} placeholder="Tell the AI how to respond — your job, tone, language preference, anything it should always remember." placeholderTextColor={colors.muted} multiline />
-          <Text style={styles.hint}>The AI keeps these in mind on every chat.</Text>
+          <TextInput style={[styles.input, { height: 96, textAlignVertical: 'top', paddingTop: 12 }]} value={instructions} onChangeText={setInstructions} placeholder={t('responseStylePlaceholder')} placeholderTextColor={colors.muted} multiline />
+          <Text style={styles.hint}>{t('responseStyleHint')}</Text>
+          <Pressable style={styles.memoryLink} onPress={() => navigation.navigate('Memory')}>
+            <Ionicons name="bulb-outline" size={17} color={colors.primary} />
+            <Text style={styles.memoryLinkTxt}>{t('manageMemory')}</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+          </Pressable>
         </View>
 
         <Pressable style={styles.saveBtn} onPress={save} disabled={saving}>
@@ -178,4 +186,6 @@ const makeStyles = (colors) => StyleSheet.create({
   chipTxt: { color: colors.muted, fontFamily: fonts.medium, fontSize: 13 },
   saveBtn: { backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
   saveTxt: { color: colors.white, fontFamily: fonts.semibold, fontSize: 15 },
+  memoryLink: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+  memoryLinkTxt: { flex: 1, color: colors.primary, fontFamily: fonts.semibold, fontSize: 13.5 },
 });

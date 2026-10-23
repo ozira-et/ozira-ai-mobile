@@ -27,6 +27,7 @@ import LibraryScreen from '../screens/LibraryScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import UsageScreen from '../screens/UsageScreen';
 import VoiceScreen from '../screens/VoiceScreen';
+import MemoryScreen from '../screens/MemoryScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -77,6 +78,7 @@ function AppStack() {
         <Stack.Screen name="Profile" component={ProfileScreen} />
         <Stack.Screen name="Usage" component={UsageScreen} />
         <Stack.Screen name="Voice" component={VoiceScreen} />
+        <Stack.Screen name="Memory" component={MemoryScreen} />
       </Stack.Navigator>
 
       {/* Red drawer overlay (handles its own slide + backdrop). */}

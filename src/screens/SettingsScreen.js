@@ -21,7 +21,7 @@ const VOICES = [
   { label: 'Yonas', voice: 'Puck' },
 ];
 
-export default function SettingsScreen() {
+export default function SettingsScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -182,6 +182,11 @@ export default function SettingsScreen() {
             </View>
             <Switch value={st.improveModel} onValueChange={v => update({ improveModel: v })} trackColor={{ true: colors.primary }} />
           </View>
+          <Pressable style={({ pressed }) => [styles.row, pressed && styles.rowPressed]} onPress={() => navigation.navigate('Memory')}>
+            <Ionicons name="bulb-outline" size={19} color={colors.primary} />
+            <View style={{ flex: 1 }}><Text style={[styles.rowLabel, rtlText(rtl)]}>{t('mMemory')}</Text><Text style={[styles.rowSub, rtlText(rtl)]}>{t('mMemorySub')}</Text></View>
+            <Ionicons name={rtlIcon('chevron-forward', rtl)} size={17} color={colors.muted} />
+          </Pressable>
           <Pressable style={styles.row} onPress={purge}>
             <Ionicons name="trash-outline" size={19} color={colors.danger} />
             <Text style={[styles.rowLabel, { color: colors.danger }]}>{t('purgeHistory')}</Text>
