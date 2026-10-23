@@ -138,4 +138,22 @@ export const api = {
   settingsLang: (lang, token) => req('/api/settings/lang', { body: { lang }, token }),
   settings: (token) => req('/api/settings', { token }),
   saveSettings: (settings, token) => req('/api/settings', { body: { settings }, token }),
+  // --- unified memory (backend store.memories via /v1/memories) ---
+  // The server recalls these memories and injects them into every chat prompt;
+  // the client never sends them itself.
+  memories: (token) => req('/v1/memories', { token }),
+  memoryCreate: (input, token) => req('/v1/memories', { body: { ...input, evidence: memoryEvidence() }, token }),
+  memoryCorrect: (id, content, reason, token) => req('/v1/memories/' + encodeURIComponent(id) + '/correct', { body: { content, reason, evidence: memoryEvidence(), requestId: requestId() }, token }),
+  memoryApprove: (id, token) => req('/v1/memories/' + encodeURIComponent(id), { method: 'PATCH', body: { status: 'active', requestId: requestId() }, token }),
+  memoryDelete: (id, token) => req('/v1/memories/' + encodeURIComponent(id), { method: 'DELETE', body: { requestId: requestId() }, token }),
+  memoryDeleteAll: (token) => req('/v1/memories', { method: 'DELETE', body: { requestId: requestId() }, token }),
+  // Canonical settings registry. Memory recall/capture require BOTH consent
+  // keys persisted as user-scope true, so the toggle always writes both.
+  memorySettings: (token) => req('/v1/settings', { token }),
+  saveMemorySettings: (settings, token) => req('/v1/settings', { method: 'PATCH', body: { settings }, token }),
 };
+
+function requestId() { return 'm_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10); }
+// Manual memories are user statements made in the Memory screen; the backend
+// requires a non-empty source conversation/message pair for every write.
+function memoryEvidence() { return { sourceConversationId: 'mobile-memory-screen', sourceMessageId: requestId() }; }
